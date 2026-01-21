@@ -36,6 +36,7 @@ Automated video downloader that monitors a YouTube "todo" playlist, downloads vi
   - `DONE_PLAYLIST_ID`: Destination playlist for completed downloads
   - `DOWNLOAD_PATH`: Directory for saved videos (optional, default: `./downloads`)
   - `POLL_INTERVAL`: Seconds between checks (optional, default: 300)
+  - `DOWNLOAD_MODE`: Download type - `video` (full video, default) or `audio` (audio-only MP3)
 
 ## Key Workflows
 
@@ -93,11 +94,23 @@ python manage_playlist.py --daemon
 ```python
 import yt_dlp
 
+# Full video download
 ydl_opts = {
-    'format': 'best',
+    'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
     'outtmpl': '%(title)s.%(ext)s',
     'quiet': False,
     'no_warnings': False,
+}
+
+# Audio-only download (converted to MP3)
+ydl_opts_audio = {
+    'format': 'bestaudio[ext=m4a]/bestaudio',
+    'outtmpl': '%(title)s.%(ext)s',
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192',
+    }],
 }
 
 with yt_dlp.YoutubeDL(ydl_opts) as ydl:

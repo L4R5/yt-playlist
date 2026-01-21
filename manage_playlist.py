@@ -33,6 +33,7 @@ TODO_PLAYLIST_ID = os.getenv('TODO_PLAYLIST_ID')
 DONE_PLAYLIST_ID = os.getenv('DONE_PLAYLIST_ID')
 DOWNLOAD_PATH = Path(os.getenv('DOWNLOAD_PATH', './downloads'))
 POLL_INTERVAL = int(os.getenv('POLL_INTERVAL', 5))
+DOWNLOAD_MODE = os.getenv('DOWNLOAD_MODE', 'video').lower()  # 'video' or 'audio'
 
 # OAuth2 scopes for YouTube API
 SCOPES = ['https://www.googleapis.com/auth/youtube']
@@ -178,8 +179,16 @@ class PlaylistManager:
         Returns:
             True if download successful, False otherwise
         """
+        # Configure format based on download mode
+        if DOWNLOAD_MODE == 'audio':
+            format_string = 'bestaudio[ext=m4a]/bestaudio'
+            logger.info(f"Download mode: audio-only")
+        else:
+            format_string = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+            logger.info(f"Download mode: full video")
+        
         ydl_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'format': format_string,
             'outtmpl': str(download_path / '%(title)s.%(ext)s'),
             'quiet': False,
             'no_warnings': False,
@@ -188,6 +197,14 @@ class PlaylistManager:
             'retries': 10,
             'fragment_retries': 10,
         }
+        
+        # Add postprocessor for audio-only mode to ensure proper format
+        if DOWNLOAD_MODE == 'audio':
+            ydl_opts['postprocessors'] = [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }]
         
         try:
             logger.info(f"Starting download: {video['title']}")

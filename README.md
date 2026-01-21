@@ -58,7 +58,13 @@ TODO_PLAYLIST_ID=PLxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 DONE_PLAYLIST_ID=PLyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
 DOWNLOAD_PATH=./downloads
 POLL_INTERVAL=300
+DOWNLOAD_MODE=video  # Options: 'video' or 'audio'
 ```
+
+### Download Modes
+
+- **`video`** (default): Downloads full video with best quality video and audio
+- **`audio`**: Downloads audio-only, converts to MP3 (192 kbps)
 
 ### 5. First Run - Authenticate
 
