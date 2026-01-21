@@ -1,0 +1,18 @@
+services:
+  yt-playlist:
+    build: .
+    container_name: youtube-playlist-manager
+    restart: unless-stopped
+    environment:
+      - TODO_PLAYLIST_ID=${TODO_PLAYLIST_ID}
+      - DONE_PLAYLIST_ID=${DONE_PLAYLIST_ID}
+      - POLL_INTERVAL=${POLL_INTERVAL:-300}
+    volumes:
+      # Mount directory containing client_secret.json and token.json
+      - ./data:/app/data
+      # Mount directory for downloaded videos
+      - ./downloads:/app/downloads
+    # For initial OAuth authentication, use:
+    # ports:
+    #   - "8080:8080"
+    # Then run: docker-compose run --rm yt-playlist --help
