@@ -64,7 +64,7 @@ DOWNLOAD_MODE=video  # Options: 'video' or 'audio'
 ### Download Modes
 
 - **`video`** (default): Downloads full video with best quality video and audio
-- **`audio`**: Downloads audio-only, converts to MP3 (192 kbps)
+- **`audio`**: Downloads audio-only in original format (typically M4A)
 
 ### 5. First Run - Authenticate
 

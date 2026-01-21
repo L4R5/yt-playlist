@@ -182,7 +182,7 @@ class PlaylistManager:
         # Configure format based on download mode
         if DOWNLOAD_MODE == 'audio':
             format_string = 'bestaudio[ext=m4a]/bestaudio'
-            logger.info(f"Download mode: audio-only")
+            logger.info(f"Download mode: audio-only (original format)")
         else:
             format_string = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
             logger.info(f"Download mode: full video")
@@ -197,14 +197,6 @@ class PlaylistManager:
             'retries': 10,
             'fragment_retries': 10,
         }
-        
-        # Add postprocessor for audio-only mode to ensure proper format
-        if DOWNLOAD_MODE == 'audio':
-            ydl_opts['postprocessors'] = [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }]
         
         try:
             logger.info(f"Starting download: {video['title']}")
