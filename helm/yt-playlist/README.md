@@ -252,12 +252,18 @@ helm install yt-playlist ./helm/yt-playlist \
   --set auth.ui.enabled=true \
   --set auth.ui.ingress.enabled=true \
   --set auth.ui.ingress.hosts[0].host=auth.example.com \
+  --set auth.ui.redirectUri=https://auth.example.com/callback \
   --set playlists.todoPlaylistId=PLxxxx \
   --set playlists.donePlaylistId=PLyyyy \
   --set clientSecretJson='{"installed":{...}}'
 
 # Open https://auth.example.com and authenticate
 ```
+
+**Important:** 
+- Set `auth.ui.redirectUri` to match your ingress URL + `/callback`
+- Add the same URI (`https://auth.example.com/callback`) to "Authorized redirect URIs" in Google Cloud Console OAuth client settings
+- Without `redirectUri` set, the app auto-detects the URL (works for port-forward, may fail with ingress)
 
 ### Method 2: Authentication Job (Command Line)
 

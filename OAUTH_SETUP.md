@@ -34,9 +34,29 @@
    - Go to "APIs & Services" → "Credentials"
    - Click "+ CREATE CREDENTIALS" at top
    - Select "OAuth client ID"
+   
+   **Choose application type based on your deployment:**
+   
+   **Option A: Desktop app** (for CLI/local usage only)
    - Application type: **Desktop app**
    - Name: "Playlist Manager Desktop Client"
    - Click "Create"
+   - Note: Desktop apps have fixed redirect URIs (`http://localhost`, `urn:ietf:wg:oauth:2.0:oob`)
+   - Cannot add custom redirect URIs
+   - ✅ Works for: CLI usage, local development
+   - ❌ Does NOT work for: Kubernetes auth UI with ingress
+   
+   **Option B: Web application** (recommended for Kubernetes/Ingress)
+   - Application type: **Web application**
+   - Name: "Playlist Manager Web Client"
+   - Under "Authorized redirect URIs", click "ADD URI" and add:
+     - `http://localhost` (for local/CLI usage)
+     - `http://localhost:5000/callback` (for auth UI with port-forward)
+     - `https://auth.example.com/callback` (replace with your actual ingress domain)
+   - Click "Create"
+   - ✅ Works for: Everything (CLI, port-forward, ingress)
+   
+   **Recommendation:** Use **Web application** type for maximum flexibility, especially if planning to use Kubernetes auth UI with ingress.
 
 6. **Download Credentials**
    - Click the download icon (⬇️) next to your newly created OAuth client
@@ -59,6 +79,41 @@
    - Done! Token saved to `token.json`
 
 ## Troubleshooting
+
+### "Error 400: redirect_uri_mismatch"
+
+**Problem:** Google OAuth is rejecting the redirect URI.
+
+**Root cause:** You're likely using a Desktop app OAuth client, which has fixed redirect URIs and cannot be customized.
+
+**Solution:**
+
+**If using Desktop app type:**
+- Desktop app clients only support `http://localhost` (any port) and `urn:ietf:wg:oauth:2.0:oob`
+- This works for CLI usage but NOT for auth UI with custom ingress domains
+- If you need custom redirect URIs, create a new Web application OAuth client (see below)
+
+**If using Web application type:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Navigate to **"APIs & Services"** → **"Credentials"**
+3. Click on your **Web application** OAuth client name
+4. Scroll down to **"Authorized redirect URIs"** section
+5. Click **"ADD URI"** and add the redirect URI that matches your deployment:
+   - `http://localhost` (for CLI usage)
+   - `http://localhost:5000/callback` (for auth UI with port-forward)
+   - `https://your-domain.com/callback` (for auth UI with ingress)
+6. Click **"SAVE"**
+7. **Wait 5 minutes** for changes to propagate
+8. Try authenticating again
+
+**Create new Web application OAuth client:**
+1. Go to "APIs & Services" → "Credentials"
+2. Click "+ CREATE CREDENTIALS" → "OAuth client ID"
+3. Application type: **Web application**
+4. Name: "Playlist Manager Web Client"
+5. Add redirect URIs as needed
+6. Download the new credentials
+7. Replace your old `client_secret.json` with the new one
 
 ### "Access blocked: This app's request is invalid"
 - Make sure you added your email as a test user in OAuth consent screen

@@ -21,6 +21,7 @@ SECRET_NAME = os.getenv('SECRET_NAME', 'yt-playlist-credentials')
 NAMESPACE = os.getenv('NAMESPACE', 'default')
 SCOPES = ['https://www.googleapis.com/auth/youtube']
 PORT = int(os.getenv('PORT', 5000))
+REDIRECT_URI = os.getenv('REDIRECT_URI', None)  # Optional: explicit redirect URI for ingress
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -101,11 +102,15 @@ def auth():
     try:
         client_config = get_client_config()
         
-        # Create flow with dynamic redirect URI
+        # Use explicit redirect URI if set (for ingress), otherwise auto-detect
+        redirect_uri = REDIRECT_URI or url_for('callback', _external=True)
+        logger.info(f"Using redirect URI: {redirect_uri}")
+        
+        # Create flow with redirect URI
         flow = Flow.from_client_config(
             client_config,
             scopes=SCOPES,
-            redirect_uri=url_for('callback', _external=True)
+            redirect_uri=redirect_uri
         )
         
         authorization_url, state = flow.authorization_url(
@@ -133,12 +138,15 @@ def callback():
         
         client_config = get_client_config()
         
+        # Use explicit redirect URI if set (for ingress), otherwise auto-detect
+        redirect_uri = REDIRECT_URI or url_for('callback', _external=True)
+        
         # Complete the flow
         flow = Flow.from_client_config(
             client_config,
             scopes=SCOPES,
             state=state,
-            redirect_uri=url_for('callback', _external=True)
+            redirect_uri=redirect_uri
         )
         
         flow.fetch_token(authorization_response=request.url)

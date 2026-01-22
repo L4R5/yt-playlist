@@ -158,6 +158,9 @@ auth:
   # Web UI for OAuth authentication (recommended)
   ui:
     enabled: false
+    # Optional: Explicit redirect URI for OAuth (required when using ingress)
+    # Example: https://auth.example.com/callback
+    redirectUri: ""
     image:
       repository: ghcr.io/l4r5/yt-playlist-auth-ui
       tag: latest

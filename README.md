@@ -98,6 +98,8 @@ python manage_playlist.py
 4. Authentication complete! Token saved to `token.json`
 5. Subsequent runs won't require re-authentication
 
+**Troubleshooting OAuth errors**: If you see "Error 400: redirect_uri_mismatch", check that your OAuth client in Google Cloud Console has the correct redirect URIs configured. See [OAUTH_SETUP.md](OAUTH_SETUP.md#troubleshooting) for details.
+
 ## Usage
 
 ### Run Once (Process Current Queue)

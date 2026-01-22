@@ -51,6 +51,7 @@ spec:
         auth:
           ui:
             enabled: true  # Enable for first-time setup, then disable
+            redirectUri: https://auth.yt-playlist.example.com/callback  # Required for ingress
             ingress:
               enabled: false  # Set to true if you want external access
               className: nginx

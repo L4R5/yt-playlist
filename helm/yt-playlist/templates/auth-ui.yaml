@@ -75,6 +75,10 @@ spec:
           value: {{ .Values.existingSecret | default .Values.secretName }}
         - name: NAMESPACE
           value: {{ .Release.Namespace }}
+        {{- if .Values.auth.ui.redirectUri }}
+        - name: REDIRECT_URI
+          value: {{ .Values.auth.ui.redirectUri }}
+        {{- end }}
         {{- if .Values.clientSecretJson }}
         - name: CLIENT_SECRET_JSON
           valueFrom:
