@@ -2,8 +2,8 @@ apiVersion: v2
 name: yt-playlist
 description: YouTube Playlist Manager - Automated video downloader with playlist management
 type: application
-version: 1.0.21
-appVersion: "1.0.21"
+version: 1.0.22
+appVersion: "1.0.22"
 keywords:
   - youtube
   - downloader
