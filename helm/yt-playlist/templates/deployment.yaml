@@ -66,6 +66,20 @@ spec:
             configMapKeyRef:
               name: {{ include "yt-playlist.fullname" . }}
               key: LOG_FILE
+        {{- if .Values.download.cookiesFile }}
+        - name: COOKIES_FILE
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: COOKIES_FILE
+        {{- end }}
+        {{- if .Values.download.cookiesContent }}
+        - name: COOKIES_CONTENT
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: COOKIES_CONTENT
+        {{- end }}
         {{- if or .Values.clientSecretJson .Values.existingSecret }}
         - name: CLIENT_SECRET_JSON
           valueFrom:

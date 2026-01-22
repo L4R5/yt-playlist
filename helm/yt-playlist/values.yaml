@@ -92,6 +92,11 @@ download:
   mode: video
   # Poll interval in seconds (how often to check for new videos)
   pollInterval: 300
+  # YouTube cookies for bot detection bypass (use ONE method):
+  # Method 1: Path to cookies.txt file (if mounted as volume)
+  cookiesFile: ""
+  # Method 2: Cookies content as string (recommended - store in secret)
+  cookiesContent: ""
 
 # Logging configuration
 logging:

@@ -9,5 +9,11 @@ data:
   DONE_PLAYLIST_ID: {{ .Values.playlists.donePlaylistId | quote }}
   DOWNLOAD_MODE: {{ .Values.download.mode | quote }}
   POLL_INTERVAL: {{ .Values.download.pollInterval | quote }}
+  {{- if .Values.download.cookiesFile }}
+  COOKIES_FILE: {{ .Values.download.cookiesFile | quote }}
+  {{- end }}
+  {{- if .Values.download.cookiesContent }}
+  COOKIES_CONTENT: {{ .Values.download.cookiesContent | quote }}
+  {{- end }}
   LOG_LEVEL: {{ .Values.logging.level | quote }}
   LOG_FILE: {{ .Values.logging.file | quote }}

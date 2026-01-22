@@ -38,6 +38,8 @@ DONE_PLAYLIST_ID = os.getenv('DONE_PLAYLIST_ID')
 DOWNLOAD_PATH = Path(os.getenv('DOWNLOAD_PATH', './downloads'))
 POLL_INTERVAL = int(os.getenv('POLL_INTERVAL', 5))
 DOWNLOAD_MODE = os.getenv('DOWNLOAD_MODE', 'video').lower()  # 'video' or 'audio'
+COOKIES_FILE = os.getenv('COOKIES_FILE', '')  # Optional: path to cookies.txt file
+COOKIES_CONTENT = os.getenv('COOKIES_CONTENT', '')  # Optional: cookies.txt content as string
 METRICS_PORT = int(os.getenv('METRICS_PORT', 8080))
 
 # OAuth2 scopes for YouTube API
@@ -350,6 +352,20 @@ class PlaylistManager:
             'fragment_retries': 10,
         }
         
+        # Add cookies if provided (helps bypass bot detection)
+        cookies_temp_file = None
+        if COOKIES_CONTENT:
+            # Write cookies content to temp file
+            import tempfile
+            cookies_temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
+            cookies_temp_file.write(COOKIES_CONTENT)
+            cookies_temp_file.close()
+            ydl_opts['cookiefile'] = cookies_temp_file.name
+            logger.debug(f"Using cookies from COOKIES_CONTENT environment variable")
+        elif COOKIES_FILE and os.path.exists(COOKIES_FILE):
+            ydl_opts['cookiefile'] = COOKIES_FILE
+            logger.debug(f"Using cookies from file: {COOKIES_FILE}")
+        
         try:
             logger.info(f"Starting download: {video['title']}")
             downloads_total.labels(status='attempted').inc()
@@ -366,6 +382,10 @@ class PlaylistManager:
             logger.error(f"Failed to download {video['title']}: {e}")
             downloads_total.labels(status='failed').inc()
             return False
+        finally:
+            # Clean up temp cookies file if created
+            if cookies_temp_file and os.path.exists(cookies_temp_file.name):
+                os.unlink(cookies_temp_file.name)
     
     def remove_from_playlist(self, playlist_item_id: str) -> bool:
         """
