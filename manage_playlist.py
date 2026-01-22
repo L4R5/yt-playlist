@@ -348,6 +348,11 @@ class PlaylistManager:
             'no_warnings': False,
             'ignoreerrors': False,
             'nocheckcertificate': True,
+            'extractor_args': {
+                'youtube': {
+                    'js_runtimes': ['node']  # Use Node.js for YouTube challenge solving
+                }
+            },
             'retries': 10,
             'fragment_retries': 10,
         }
