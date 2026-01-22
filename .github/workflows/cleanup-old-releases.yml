@@ -104,16 +104,37 @@ jobs:
                 }
               );
               
-              console.log(`Found ${versions.length} versions for ${imageName}`);
+              console.log(`Found ${versions.length} total versions for ${imageName}`);
               
-              // Sort by created_at (newest first)
-              versions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              // Separate tagged and untagged versions
+              const taggedVersions = [];
+              const untaggedVersions = [];
               
-              // Delete old versions (beyond keepCount)
-              const versionsToDelete = versions.slice(keepCount);
-              console.log(`Deleting ${versionsToDelete.length} old versions`);
+              for (const version of versions) {
+                const tags = version.metadata?.container?.tags || [];
+                if (tags.length > 0) {
+                  taggedVersions.push(version);
+                } else {
+                  untaggedVersions.push(version);
+                }
+              }
               
-              for (const version of versionsToDelete) {
+              console.log(`Tagged versions: ${taggedVersions.length}, Untagged versions: ${untaggedVersions.length}`);
+              
+              // Sort tagged versions by created_at (newest first)
+              taggedVersions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              
+              // Keep the latest N tagged versions, delete the rest
+              const taggedToDelete = taggedVersions.slice(keepCount);
+              console.log(`Will delete ${taggedToDelete.length} old tagged versions (keeping ${Math.min(keepCount, taggedVersions.length)})`);
+              
+              // Delete all untagged versions (they're orphaned from tag updates)
+              console.log(`Will delete ${untaggedVersions.length} untagged versions`);
+              
+              const allToDelete = [...taggedToDelete, ...untaggedVersions];
+              console.log(`Total versions to delete: ${allToDelete.length}`);
+              
+              for (const version of allToDelete) {
                 const tags = version.metadata?.container?.tags || [];
                 const tagStr = tags.length > 0 ? tags.join(', ') : 'untagged';
                 console.log(`Deleting version ID ${version.id} (tags: ${tagStr}, created: ${version.created_at})`);
@@ -130,6 +151,8 @@ jobs:
                   console.log(`Failed to delete version ${version.id}: ${error.message}`);
                 }
               }
+              
+              console.log(`Cleanup complete for ${imageName}`);
             } catch (error) {
               if (error.status === 404) {
                 console.log(`Package ${imageName} not found - may not exist yet`);
