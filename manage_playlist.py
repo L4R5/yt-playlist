@@ -226,7 +226,7 @@ class PlaylistManager:
                     logger.error("See README.md for instructions")
                     raise FileNotFoundError("Client credentials not found")
                 
-                creds = flow.run_local_server(port=0)  # Use random available port
+                creds = flow.run_local_server(port=8081)  # Use port 8081 (metrics on 8080, add http://localhost:8081 to OAuth redirect URIs)
                 logger.info("Authentication successful!")
             
             # Save credentials for next run
