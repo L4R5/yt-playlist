@@ -94,15 +94,35 @@ jobs:
             
             try {
               // Get all versions of the package
-              const versions = await github.paginate(
-                github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg,
-                {
-                  package_type: 'container',
-                  package_name: imageName,
-                  org: context.repo.owner,
-                  per_page: 100
+              // Try organization API first, fall back to user API
+              let versions;
+              try {
+                versions = await github.paginate(
+                  github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg,
+                  {
+                    package_type: 'container',
+                    package_name: imageName,
+                    org: context.repo.owner,
+                    per_page: 100
+                  }
+                );
+              } catch (orgError) {
+                if (orgError.status === 404) {
+                  // Not an organization, try user API
+                  console.log(`Not an organization, trying user API`);
+                  versions = await github.paginate(
+                    github.rest.packages.getAllPackageVersionsForPackageOwnedByUser,
+                    {
+                      package_type: 'container',
+                      package_name: imageName,
+                      username: context.repo.owner,
+                      per_page: 100
+                    }
+                  );
+                } else {
+                  throw orgError;
                 }
-              );
+              }
               
               console.log(`Found ${versions.length} total versions for ${imageName}`);
               
@@ -147,8 +167,19 @@ jobs:
                     package_version_id: version.id
                   });
                   console.log(`Successfully deleted version ${version.id}`);
-                } catch (error) {
-                  console.log(`Failed to delete version ${version.id}: ${error.message}`);
+                } catch (deleteError) {
+                  // Try user API if org API fails
+                  if (deleteError.status === 404) {
+                    await github.rest.packages.deletePackageVersionForUser({
+                      package_type: 'container',
+                      package_name: imageName,
+                      username: context.repo.owner,
+                      package_version_id: version.id
+                    });
+                    console.log(`Successfully deleted version ${version.id} (user API)`);
+                  } else {
+                    console.log(`Failed to delete version ${version.id}: ${deleteError.message}`);
+                  }
                 }
               }
               
