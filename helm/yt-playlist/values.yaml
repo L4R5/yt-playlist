@@ -30,7 +30,7 @@ serviceMonitor:
 # Ingress (not typically needed for background daemon)
 ingress:
   enabled: false
-  className: "nginx"  # Or traefik, haproxy, etc.
+  className: ""  # Use cluster default ingress controller, or specify: nginx, traefik, haproxy, etc.
   annotations:
     # For automatic certificate management with cert-manager
     cert-manager.io/cluster-issuer: letsencrypt-prod
@@ -173,7 +173,7 @@ auth:
       nodePort: null  # Set if using NodePort
     ingress:
       enabled: false
-      className: "nginx"  # Or traefik, haproxy, etc.
+      className: ""  # Use cluster default ingress controller, or specify: nginx, traefik, haproxy, etc.
       annotations:
         # For automatic certificate management with cert-manager
         cert-manager.io/cluster-issuer: letsencrypt-prod
