@@ -185,7 +185,15 @@ class PlaylistManager:
         # Load existing token if available
         if os.path.exists(self.token_file):
             logger.info(f"Loading existing credentials from {self.token_file}")
-            creds = Credentials.from_authorized_user_file(self.token_file, SCOPES)
+            try:
+                creds = Credentials.from_authorized_user_file(self.token_file, SCOPES)
+            except ValueError as e:
+                # Token file exists but missing refresh_token - wait for re-authentication
+                if "missing fields refresh_token" in str(e):
+                    logger.warning(f"Token file is missing refresh_token: {e}")
+                    logger.warning("Waiting for authentication via auth UI...")
+                    return None
+                raise
         
         # If no valid credentials, authenticate
         if not creds or not creds.valid:
@@ -228,13 +236,27 @@ class PlaylistManager:
     
     def _init_youtube_client(self) -> None:
         """Initialize YouTube API client with OAuth2."""
-        try:
-            creds = self._get_credentials()
-            self.youtube = build('youtube', 'v3', credentials=creds)
-            logger.info("YouTube API client initialized successfully with OAuth2")
-        except Exception as e:
-            logger.error(f"Failed to initialize YouTube API client: {e}")
-            raise
+        retry_delay = 10  # Start with 10 seconds
+        max_delay = 300   # Max 5 minutes between retries
+        
+        while True:
+            try:
+                creds = self._get_credentials()
+                if creds is None:
+                    # Waiting for authentication
+                    logger.info(f"Waiting for valid credentials... retrying in {retry_delay} seconds")
+                    time.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 1.5, max_delay)  # Exponential backoff
+                    continue
+                
+                self.youtube = build('youtube', 'v3', credentials=creds)
+                logger.info("YouTube API client initialized successfully with OAuth2")
+                return
+            except Exception as e:
+                logger.error(f"Failed to initialize YouTube API client: {e}")
+                logger.info(f"Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 1.5, max_delay)
     
     def get_playlist_videos(self, playlist_id: str) -> List[Dict[str, str]]:
         """
