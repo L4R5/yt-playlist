@@ -32,6 +32,20 @@ jobs:
         with:
           version: v3.14.0
 
+      - name: Enable GitHub Pages
+        run: |
+          # Check if Pages is already enabled
+          if ! gh api repos/${{ github.repository }}/pages --silent 2>/dev/null; then
+            echo "Enabling GitHub Pages..."
+            gh api -X POST repos/${{ github.repository }}/pages \
+              -f source[branch]=gh-pages \
+              -f source[path]=/
+          else
+            echo "GitHub Pages already enabled"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.6.0
         with:
