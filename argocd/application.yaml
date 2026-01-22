@@ -39,6 +39,8 @@ spec:
           enabled: true
           size: 10Gi
           storageClass: ""  # Use default storage class
+          retain: true  # Keep PVC after app deletion (recommended for production)
+          subPath: ""  # Optional: use subdirectory within PVC (e.g., "production")
         
         # Authentication UI (for initial OAuth setup)
         auth:

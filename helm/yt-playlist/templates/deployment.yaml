@@ -78,6 +78,9 @@ spec:
         volumeMounts:
         - name: downloads
           mountPath: /app/downloads
+          {{- if .Values.persistence.subPath }}
+          subPath: {{ .Values.persistence.subPath }}
+          {{- end }}
         - name: data
           mountPath: /app/data
         resources:

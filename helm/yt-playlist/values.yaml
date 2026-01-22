@@ -101,6 +101,11 @@ persistence:
   size: 50Gi
   # Existing PVC name (if you want to use pre-created PVC)
   existingClaim: ""
+  # Retention policy: 'delete' (default) or 'keep'
+  # When set to 'keep', PVC will not be deleted when Helm release is uninstalled
+  retain: false  # Set to true to keep data after app deletion
+  # SubPath within the volume (useful for sharing PVC between multiple apps/environments)
+  subPath: ""  # e.g., "production", "dev", "tenant-a"
 
 # Service account
 serviceAccount:

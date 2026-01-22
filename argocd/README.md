@@ -136,6 +136,7 @@ source:
         enabled: true
         size: 50Gi
         storageClass: fast-ssd
+        retain: true  # Keep data after app deletion
       
       auth:
         ui:
@@ -259,6 +260,93 @@ auth:
             - app.yt-playlist.example.com
             - "*.yt-playlist.example.com"
 ```
+
+## Data Persistence and Retention
+
+### PVC Retention Policy
+
+By default, PersistentVolumeClaims are deleted when the Helm release is uninstalled. To keep downloaded videos after app deletion:
+
+```yaml
+persistence:
+  enabled: true
+  size: 50Gi
+  retain: true  # Add this to keep PVC after uninstall
+  subPath: ""  # Optional: mount subdirectory (e.g., "production")
+```
+
+**When `retain: true`:**
+- PVC survives `helm uninstall` or `argocd app delete`
+- Downloaded videos are preserved
+- Reinstalling will create a new PVC (old one must be manually deleted or reused)
+
+**Using subPath for multi-environment:**
+
+Share a single PVC across multiple environments/applications:
+
+```yaml
+# Production environment
+persistence:
+  existingClaim: shared-videos
+  subPath: production
+
+# Staging environment
+persistence:
+  existingClaim: shared-videos
+  subPath: staging
+```
+
+Common subPath patterns: `dev`, `staging`, `production`, `tenant-a`, `customer-123`
+
+**Manual PVC cleanup after retention:**
+```bash
+# List retained PVCs
+kubectl get pvc -n yt-playlist
+
+# Delete old PVC when no longer needed
+kubectl delete pvc yt-playlist-downloads -n yt-playlist
+```
+
+### Reusing Retained PVC
+
+To reuse an existing PVC from a previous installation:
+
+```yaml
+persistence:
+  enabled: true
+  existingClaim: yt-playlist-downloads  # Name of the retained PVC
+```
+
+### Production Recommendations
+
+For production deployments:
+
+1. **Enable retention:**
+   ```yaml
+   persistence:
+     retain: true
+   ```
+
+2. **Use storage class with backups:**
+   ```yaml
+   persistence:
+     storageClass: ssd-backup  # Storage class with snapshot capability
+   ```
+
+3. **Consider VolumeSnapshots:**
+   ```bash
+   # Create snapshot before major changes
+   kubectl create -f - <<EOF
+   apiVersion: snapshot.storage.k8s.io/v1
+   kind: VolumeSnapshot
+   metadata:
+     name: yt-playlist-backup-$(date +%Y%m%d)
+     namespace: yt-playlist
+   spec:
+     source:
+       persistentVolumeClaimName: yt-playlist-downloads
+   EOF
+   ```
 
 ## Sync Policies
 

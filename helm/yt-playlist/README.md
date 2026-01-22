@@ -92,6 +92,7 @@ helm upgrade yt-playlist ./helm/yt-playlist --set auth.enabled=false --reuse-val
 | `persistence.enabled` | Enable persistent storage | `true` |
 | `persistence.size` | Storage size for downloads | `50Gi` |
 | `persistence.storageClass` | Storage class name | `""` (default) |
+| `persistence.retain` | Keep PVC after uninstall | `false` |
 | `resources.limits.cpu` | CPU limit | `1000m` |
 | `resources.limits.memory` | Memory limit | `1Gi` |
 | `auth.enabled` | Enable authentication job | `false` |
@@ -130,6 +131,7 @@ persistence:
   enabled: true
   size: 100Gi
   storageClass: fast-ssd
+  retain: true  # Keep data after uninstall (recommended for production)
 
 # Resources
 resources:
@@ -155,6 +157,56 @@ Install with custom values:
 
 ```bash
 helm install yt-playlist ./helm/yt-playlist -f custom-values.yaml
+```
+
+## Data Persistence and Retention
+
+By default, the PVC for downloaded videos is deleted when you uninstall the Helm release. For production deployments, you may want to preserve the data:
+
+```yaml
+persistence:
+  enabled: true
+  size: 100Gi
+  retain: true  # Keep PVC after helm uninstall
+```
+
+**Use cases for retention:**
+- **Upgrades**: Preserve downloaded videos during application upgrades
+- **Disaster recovery**: Maintain data even if the application is removed
+- **Cost optimization**: Avoid re-downloading large video files
+
+**Using subPath for shared storage:**
+
+When multiple applications or environments share the same PVC:
+
+```yaml
+persistence:
+  enabled: true
+  existingClaim: shared-videos-pvc
+  subPath: production  # Each environment gets its own subdirectory
+```
+
+Common subPath patterns:
+- **Environment separation**: `dev`, `staging`, `production`
+- **Multi-tenant**: `tenant-a`, `tenant-b`, `customer-123`
+- **Application instances**: `playlist-manager-1`, `playlist-manager-2`
+
+**Reusing a retained PVC:**
+
+```bash
+# After uninstalling with retain=true, the PVC still exists
+kubectl get pvc yt-playlist-downloads
+
+# Reinstall and reuse the PVC
+helm install yt-playlist ./helm/yt-playlist \
+  --set persistence.existingClaim=yt-playlist-downloads
+```
+
+**Manual cleanup:**
+
+```bash
+# Delete the retained PVC when no longer needed
+kubectl delete pvc yt-playlist-downloads
 ```
 
 ## Authentication Methods
@@ -273,12 +325,19 @@ helm upgrade yt-playlist ./helm/yt-playlist \
 ## Uninstallation
 
 ```bash
-# Delete release (keeps PVC)
+# Delete release
 helm uninstall yt-playlist
 
-# Delete PVC if needed
+# Delete PVC manually if retention is enabled (persistence.retain=true)
 kubectl delete pvc yt-playlist-downloads
 ```
+
+**Data Retention:**
+- When `persistence.retain=false` (default): PVC is automatically deleted with the release
+- When `persistence.retain=true`: PVC persists after uninstall, preserving downloaded videos
+  - Useful for production deployments where data should survive upgrades
+  - Must manually delete PVC if you want to remove the data
+  - Can reuse the PVC by setting `persistence.existingClaim` in a new deployment
 
 ## Troubleshooting
 

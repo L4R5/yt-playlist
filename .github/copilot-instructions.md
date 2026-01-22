@@ -279,6 +279,105 @@ GitHub Actions workflow (`.github/workflows/docker-build.yml`):
 - Entrypoint: `python manage_playlist.py`
 - Default CMD: `--daemon`
 
+## Kubernetes Deployment
+
+### Helm Chart Structure
+**helm/yt-playlist/** - Complete chart with 14 templates:
+- **deployment.yaml**: Main application with metrics, liveness/readiness probes
+- **pvc.yaml**: Persistent storage for downloaded videos with retention policy
+- **auth-ui.yaml**: Flask web UI (Deployment, Service, RBAC) for OAuth authentication
+- **auth-job.yaml**: CLI authentication fallback (runs once, requires port-forward)
+- **secret.yaml**: OAuth credentials (supports existingSecret for external secret management)
+- **servicemonitor.yaml**: Prometheus Operator integration for metrics
+- **ingress.yaml**: TLS-enabled ingress with cert-manager annotations
+- **configmap.yaml, service.yaml, serviceaccount.yaml**: Standard Kubernetes resources
+- **_helpers.tpl, NOTES.txt**: Helm templating utilities
+
+### PVC Retention Policy
+**Critical feature for production**: Data persistence beyond application lifecycle
+
+```yaml
+# values.yaml
+persistence:
+  enabled: true
+  size: 100Gi
+  retain: true  # Adds helm.sh/resource-policy: keep annotation
+  subPath: ""  # Optional: mount subdirectory within PVC
+```
+
+**Behavior:**
+- `retain: false` (default): PVC deleted with `helm uninstall`
+- `retain: true`: PVC survives uninstall, preserving downloaded videos
+  - Useful for upgrades, disaster recovery, cost optimization
+  - Reuse with `persistence.existingClaim` in new deployment
+  - Manual cleanup: `kubectl delete pvc yt-playlist-downloads`
+
+**SubPath for shared storage:**
+- `subPath: ""` (default): Mount entire PVC volume
+- `subPath: "production"`: Mount only the `/production` subdirectory
+  - Enables multiple apps/environments to share one PVC
+  - Common patterns: environment names, tenant IDs, instance identifiers
+  - Example: `dev`, `staging`, `production`, `tenant-a`, `customer-123`
+
+**Implementation:** Conditional annotation in pvc.yaml:
+```yaml
+{{- if .Values.persistence.retain }}
+annotations:
+  helm.sh/resource-policy: keep
+{{- end }}
+```
+
+### Authentication Methods
+1. **Web UI (recommended)**: Flask app on port 5000, browser-based OAuth
+   - Deployment with RBAC (ServiceAccount, Role, RoleBinding)
+   - Automatically saves token to Kubernetes secret
+   - Multi-arch images: ghcr.io/l4r5/yt-playlist-auth-ui
+
+2. **Authentication Job**: One-time CLI authentication
+   - Requires `kubectl port-forward` for OAuth callback
+   - Job pod extracts token after user grants permissions
+
+3. **Pre-authenticate locally**: Generate token.json outside cluster
+   - Create Kubernetes secret from local file
+   - Deploy with existing token
+
+### External Secrets Integration
+**existingSecret parameter** for GitOps workflows:
+```yaml
+# values.yaml
+existingSecret: "yt-oauth-credentials"  # References external secret
+clientSecretJson: ""  # Leave empty when using existingSecret
+```
+
+Supports:
+- Sealed Secrets (Bitnami)
+- External Secrets Operator (AWS Secrets Manager, Vault, GCP Secret Manager)
+- Manual secret creation
+
+### Helm Repository Publishing
+**GitHub Pages**: https://l4r5.github.io/yt-playlist/
+- Automated via `.github/workflows/helm-release.yml`
+- Triggered on version tag push (e.g., `v1.0.6`)
+- Chart-releaser-action packages and publishes to gh-pages branch
+- Post-processing step updates release notes to clarify chart vs app versions
+
+**Usage:**
+```bash
+helm repo add yt-playlist https://l4r5.github.io/yt-playlist/
+helm install my-release yt-playlist/yt-playlist
+```
+
+### ArgoCD GitOps Deployment
+**argocd/** directory contains:
+- **application.yaml**: Single-environment deployment
+- **applicationset.yaml**: Multi-environment (dev/staging/prod) with generator
+- Production defaults: `retain: true`, TLS ingress, existingSecret
+
+**TLS Configuration** (3 approaches):
+1. Automatic with cert-manager + Let's Encrypt
+2. Manual certificates via Kubernetes secret
+3. Wildcard certificates for multiple domains
+
 ## Testing Status
 **No tests currently implemented** (mentioned in instructions but not present in codebase)
 - Suggestions in instructions.md are aspirational
@@ -286,11 +385,16 @@ GitHub Actions workflow (`.github/workflows/docker-build.yml`):
 
 ## Common Debugging Commands
 ```bash
-# Check logs in Docker
+# Docker
 docker-compose logs -f
-
-# Verify environment inside container
 docker-compose run --rm yt-playlist env
+
+# Kubernetes
+kubectl logs -f deployment/yt-playlist
+kubectl get pvc  # Check persistent volume claims
+kubectl describe pod <pod-name>
+helm status yt-playlist
+helm get values yt-playlist  # Show effective configuration
 
 # Manual authentication test
 python manage_playlist.py  # Should open browser
