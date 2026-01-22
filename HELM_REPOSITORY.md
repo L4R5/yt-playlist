@@ -126,13 +126,18 @@ git push
 ```
 
 The workflow will:
-- Automatically enable GitHub Pages (if not already enabled)
 - Package the chart
 - Create a GitHub Release tagged `yt-playlist-1.1.0`
-- Update the Helm repository index
+- Update the Helm repository index on the `gh-pages` branch
 - Push OCI artifact to ghcr.io
 
-**No manual setup required** - the workflow configures everything automatically.
+**After the first workflow run**, enable GitHub Pages manually:
+1. Go to: https://github.com/L4R5/yt-playlist/settings/pages
+2. Under "Source", select: **Deploy from a branch**
+3. Select branch: **gh-pages** and path: **/ (root)**
+4. Click **Save**
+
+This only needs to be done once - subsequent chart releases will automatically update.
 
 ## Repository Structure
 
@@ -154,10 +159,11 @@ yt-playlist/
 ### Chart Not Appearing in Repository
 
 1. Check GitHub Actions workflow status
-2. Wait a few minutes for GitHub Pages to deploy (auto-configured by workflow)
-3. Run `helm repo update`
-
-**Note**: The workflow automatically enables GitHub Pages on first run - no manual configuration needed.
+2. **Enable GitHub Pages** if this is the first run:
+   - Go to Settings → Pages
+   - Source: Deploy from a branch → gh-pages → / (root)
+3. Wait a few minutes for GitHub Pages to deploy
+4. Run `helm repo update`
 
 ### OCI Push Failed
 
