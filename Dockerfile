@@ -7,11 +7,14 @@ RUN apk add --no-cache \
     musl-dev \
     linux-headers \
     curl \
-    unzip
+    unzip \
+    gcompat
 
 # Install Deno (yt-dlp's default JavaScript runtime)
+# Note: Deno requires gcompat for glibc compatibility on Alpine
 RUN curl -fsSL https://deno.land/install.sh | sh && \
-    mv /root/.deno/bin/deno /usr/local/bin/
+    mv /root/.deno/bin/deno /usr/local/bin/ && \
+    chmod +x /usr/local/bin/deno
 
 # Set working directory
 WORKDIR /app
