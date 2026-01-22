@@ -18,4 +18,24 @@ spec:
   resources:
     requests:
       storage: {{ .Values.persistence.size }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "yt-playlist.fullname" . }}-data
+  labels:
+    {{- include "yt-playlist.labels" . | nindent 4 }}
+  {{- if .Values.persistence.retain }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.persistence.storageClass }}
+  storageClassName: {{ .Values.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: 100Mi  # Small volume for credentials and token files
 {{- end }}

@@ -72,7 +72,10 @@ spec:
             secretKeyRef:
               name: {{ .Values.existingSecret | default .Values.secretName }}
               key: CLIENT_SECRET_JSON
+              optional: true
         {{- end }}
+        - name: CREDENTIALS_FILE
+          value: "/app/secret/client_secret.json"
         - name: TOKEN_FILE
           value: "/app/data/token.json"
         - name: DOWNLOAD_PATH
@@ -93,6 +96,9 @@ spec:
           {{- end }}
         - name: data
           mountPath: /app/data
+        - name: secret-data
+          mountPath: /app/secret
+          readOnly: true
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
       volumes:
@@ -104,6 +110,13 @@ spec:
         emptyDir: {}
         {{- end }}
       - name: data
+        {{- if .Values.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ include "yt-playlist.fullname" . }}-data
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+      - name: secret-data
         secret:
           secretName: {{ .Values.existingSecret | default .Values.secretName }}
           optional: true
