@@ -1,12 +1,17 @@
 FROM python:3.13-alpine
 
-# Install system dependencies including Node.js for YouTube challenge solving
+# Install system dependencies
 RUN apk add --no-cache \
     ffmpeg \
     gcc \
     musl-dev \
     linux-headers \
-    nodejs
+    curl \
+    unzip
+
+# Install Deno (yt-dlp's default JavaScript runtime)
+RUN curl -fsSL https://deno.land/install.sh | sh && \
+    mv /root/.deno/bin/deno /usr/local/bin/
 
 # Set working directory
 WORKDIR /app

@@ -348,13 +348,10 @@ class PlaylistManager:
             'no_warnings': False,
             'ignoreerrors': False,
             'nocheckcertificate': True,
-            'extractor_args': {
-                'youtube': {
-                    'js_runtimes': ['node']  # Use Node.js for YouTube challenge solving
-                }
-            },
+
             'retries': 10,
             'fragment_retries': 10,
+            'verbose': True,  # Enable verbose output for debugging
         }
         
         # Add cookies if provided (helps bypass bot detection)
@@ -678,6 +675,20 @@ def main():
     else:
         logger.info(f"Credentials file: {CREDENTIALS_FILE}")
     logger.info(f"Token file exists: {os.path.exists(TOKEN_FILE)}")
+    
+    # Check for Deno availability (needed for YouTube challenge solving)
+    import subprocess
+    try:
+        result = subprocess.run(['deno', '--version'], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            version_line = result.stdout.split('\n')[0]
+            logger.info(f"Deno available: {version_line}")
+        else:
+            logger.warning("Deno not found - YouTube downloads may fail with 'n challenge' error")
+    except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
+        logger.warning(f"Deno check failed: {e}")
+        logger.warning("YouTube downloads may fail without JavaScript runtime")
+    
     logger.info("=" * 60)
     
     # Start Prometheus metrics server
