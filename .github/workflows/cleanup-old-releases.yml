@@ -141,23 +141,44 @@ jobs:
               
               console.log(`Tagged versions: ${taggedVersions.length}, Untagged versions: ${untaggedVersions.length}`);
               
-              // Sort tagged versions by created_at (newest first)
+              // Phase 1: Delete ALL untagged versions (orphaned images)
+              console.log(`Phase 1: Deleting all ${untaggedVersions.length} untagged versions...`);
+              for (const version of untaggedVersions) {
+                console.log(`Deleting untagged version ID ${version.id} (created: ${version.created_at})`);
+                try {
+                  await github.rest.packages.deletePackageVersionForOrg({
+                    package_type: 'container',
+                    package_name: imageName,
+                    org: context.repo.owner,
+                    package_version_id: version.id
+                  });
+                  console.log(`✓ Deleted untagged version ${version.id}`);
+                } catch (deleteError) {
+                  if (deleteError.status === 404) {
+                    await github.rest.packages.deletePackageVersionForUser({
+                      package_type: 'container',
+                      package_name: imageName,
+                      username: context.repo.owner,
+                      package_version_id: version.id
+                    });
+                    console.log(`✓ Deleted untagged version ${version.id} (user API)`);
+                  } else {
+                    console.log(`✗ Failed to delete version ${version.id}: ${deleteError.message}`);
+                  }
+                }
+              }
+              
+              // Phase 2: Keep latest N tagged versions, delete older ones
               taggedVersions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-              
-              // Keep the latest N tagged versions, delete the rest
               const taggedToDelete = taggedVersions.slice(keepCount);
-              console.log(`Will delete ${taggedToDelete.length} old tagged versions (keeping ${Math.min(keepCount, taggedVersions.length)})`);
+              const taggedToKeep = taggedVersions.slice(0, keepCount);
               
-              // Delete all untagged versions (they're orphaned from tag updates)
-              console.log(`Will delete ${untaggedVersions.length} untagged versions`);
+              console.log(`Phase 2: Keeping ${taggedToKeep.length} latest tagged versions, deleting ${taggedToDelete.length} old tagged versions`);
               
-              const allToDelete = [...taggedToDelete, ...untaggedVersions];
-              console.log(`Total versions to delete: ${allToDelete.length}`);
-              
-              for (const version of allToDelete) {
+              for (const version of taggedToDelete) {
                 const tags = version.metadata?.container?.tags || [];
-                const tagStr = tags.length > 0 ? tags.join(', ') : 'untagged';
-                console.log(`Deleting version ID ${version.id} (tags: ${tagStr}, created: ${version.created_at})`);
+                const tagStr = tags.join(', ');
+                console.log(`Deleting old tagged version ID ${version.id} (tags: ${tagStr}, created: ${version.created_at})`);
                 
                 try {
                   await github.rest.packages.deletePackageVersionForOrg({
@@ -166,9 +187,8 @@ jobs:
                     org: context.repo.owner,
                     package_version_id: version.id
                   });
-                  console.log(`Successfully deleted version ${version.id}`);
+                  console.log(`✓ Deleted tagged version ${version.id}`);
                 } catch (deleteError) {
-                  // Try user API if org API fails
                   if (deleteError.status === 404) {
                     await github.rest.packages.deletePackageVersionForUser({
                       package_type: 'container',
@@ -176,14 +196,18 @@ jobs:
                       username: context.repo.owner,
                       package_version_id: version.id
                     });
-                    console.log(`Successfully deleted version ${version.id} (user API)`);
+                    console.log(`✓ Deleted tagged version ${version.id} (user API)`);
                   } else {
-                    console.log(`Failed to delete version ${version.id}: ${deleteError.message}`);
+                    console.log(`✓ Deleted tagged version ${version.id} (user API)`);
+                  } else {
+                    console.log(`✗ Failed to delete version ${version.id}: ${deleteError.message}`);
                   }
                 }
               }
               
               console.log(`Cleanup complete for ${imageName}`);
+              console.log(`Summary: Deleted ${untaggedVersions.length} untagged + ${taggedToDelete.length} old tagged versions`);
+              console.log(`Keeping ${taggedToKeep.length} tagged versions with tags: ${taggedToKeep.map(v => v.metadata?.container?.tags?.join(',') || 'unknown').join(', ')}`);
             } catch (error) {
               if (error.status === 404) {
                 console.log(`Package ${imageName} not found - may not exist yet`);
