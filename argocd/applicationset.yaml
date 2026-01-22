@@ -56,8 +56,10 @@ spec:
             # Use environment-specific secret
             existingSecret: "yt-playlist-oauth-{{env}}"
             
-            downloadMode: video
-            pollInterval: {{pollInterval}}
+            download:
+              mode: video
+              pollInterval: {{pollInterval}}
+            
             replicaCount: {{replicaCount}}
             
             persistence:

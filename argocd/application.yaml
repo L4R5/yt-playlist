@@ -31,8 +31,9 @@ spec:
         # clientSecretJson: '{"installed":{"client_id":"...","client_secret":"...","redirect_uris":["http://localhost"]}}'
         
         # Download Configuration
-        downloadMode: video  # Options: video, audio
-        pollInterval: 300    # Seconds between playlist checks
+        download:
+          mode: video  # Options: video, audio
+          pollInterval: 5  # Seconds between playlist checks (default: 5)
         
         # Logging Configuration
         logging:
