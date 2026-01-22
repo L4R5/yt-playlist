@@ -37,10 +37,56 @@ jobs:
         with:
           charts_dir: helm
           skip_existing: true
-          config: .github/configs/cr.yaml
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           CR_SKIP_EXISTING: true
+
+      - name: Update release notes
+        run: |
+          # Get the chart version from Chart.yaml
+          cd helm/yt-playlist
+          CHART_VERSION=$(grep '^version:' Chart.yaml | awk '{print $2}')
+          APP_VERSION=$(grep '^appVersion:' Chart.yaml | awk '{print $2}' | tr -d '"')
+          DESCRIPTION=$(grep '^description:' Chart.yaml | cut -d':' -f2- | sed 's/^ *//')
+          
+          # Update release notes with clear messaging
+          gh release edit "yt-playlist-${CHART_VERSION}" --notes "## Helm Chart Release: yt-playlist v${CHART_VERSION}
+
+          ⚠️ **This is a HELM CHART release, not an application release.**
+
+          This release contains Kubernetes deployment configuration updates. The application itself is deployed via Docker images with tags specified in the chart's \`appVersion\` field.
+
+          ### Chart Information
+          - **Chart Version**: ${CHART_VERSION}
+          - **App Version**: ${APP_VERSION}
+          - **Description**: ${DESCRIPTION}
+
+          ### Installation
+
+          \`\`\`bash
+          helm repo add yt-playlist https://l4r5.github.io/yt-playlist/
+          helm repo update
+          helm install yt-playlist yt-playlist/yt-playlist --version ${CHART_VERSION}
+          \`\`\`
+
+          ### Upgrade
+
+          \`\`\`bash
+          helm repo update
+          helm upgrade yt-playlist yt-playlist/yt-playlist
+          \`\`\`
+
+          ### Documentation
+
+          - [Helm Repository Guide](https://github.com/${{ github.repository }}/blob/main/HELM_REPOSITORY.md)
+          - [Chart Configuration](https://github.com/${{ github.repository }}/blob/main/helm/yt-playlist/README.md)
+          - [Main Documentation](https://github.com/${{ github.repository }}/blob/main/README.md)
+
+          ---
+
+          **What are chart releases?** Chart versions track changes to Kubernetes deployment configuration (manifests, values, settings). Application code updates are managed separately via Docker image tags." || echo "Release notes update failed (release may already have notes)"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure GitHub Pages
         run: |
