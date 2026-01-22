@@ -348,7 +348,11 @@ class PlaylistManager:
             'no_warnings': False,
             'ignoreerrors': False,
             'nocheckcertificate': True,
-
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web'],  # Use multiple clients for better compatibility
+                }
+            },
             'retries': 10,
             'fragment_retries': 10,
             'verbose': True,  # Enable verbose output for debugging
@@ -676,17 +680,16 @@ def main():
         logger.info(f"Credentials file: {CREDENTIALS_FILE}")
     logger.info(f"Token file exists: {os.path.exists(TOKEN_FILE)}")
     
-    # Check for Deno availability (needed for YouTube challenge solving)
+    # Check for Node.js availability (needed for YouTube operations)
     import subprocess
     try:
-        result = subprocess.run(['deno', '--version'], capture_output=True, text=True, timeout=5)
+        result = subprocess.run(['node', '--version'], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
-            version_line = result.stdout.split('\n')[0]
-            logger.info(f"Deno available: {version_line}")
+            logger.info(f"Node.js available: {result.stdout.strip()}")
         else:
-            logger.warning("Deno not found - YouTube downloads may fail with 'n challenge' error")
+            logger.warning("Node.js not found - YouTube downloads may fail")
     except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
-        logger.warning(f"Deno check failed: {e}")
+        logger.warning(f"Node.js check failed: {e}")
         logger.warning("YouTube downloads may fail without JavaScript runtime")
     
     logger.info("=" * 60)

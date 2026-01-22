@@ -1,20 +1,12 @@
 FROM python:3.13-alpine
 
-# Install system dependencies
+# Install system dependencies including Node.js
 RUN apk add --no-cache \
     ffmpeg \
     gcc \
     musl-dev \
     linux-headers \
-    curl \
-    unzip \
-    gcompat
-
-# Install Deno (yt-dlp's default JavaScript runtime)
-# Note: Deno requires gcompat for glibc compatibility on Alpine
-RUN curl -fsSL https://deno.land/install.sh | sh && \
-    mv /root/.deno/bin/deno /usr/local/bin/ && \
-    chmod +x /usr/local/bin/deno
+    nodejs
 
 # Set working directory
 WORKDIR /app
