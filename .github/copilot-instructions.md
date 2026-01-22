@@ -1,141 +1,274 @@
 # YouTube Playlist Manager - AI Coding Instructions
 
 ## Project Overview
-Automated video downloader that monitors a YouTube "todo" playlist, downloads videos, and moves them to a "done" playlist for visibility. Runs continuously in the background.
+Single-file Python application that monitors a YouTube "todo" playlist, downloads videos using yt-dlp, and moves completed videos to a "done" playlist. Designed to run as a daemon with Docker deployment support.
 
-## Architecture & Components
+## Architecture
 
-### Core Module
-- **manage_playlist.py**: Main automation script
-  - Monitors "todo" playlist for new videos
-  - Downloads videos using yt-dlp
-  - Moves completed videos from "todo" → "done" playlist
-  - Handles failures gracefully (retry logic, error logging)
+### Single Module Design
+**manage_playlist.py** (443 lines) - Complete application in one file:
+- `PlaylistManager` class encapsulates all YouTube API operations
+- OAuth2 authentication with automatic token refresh
+- Video processing pipeline: download → add to done → remove from todo
+- Daemon mode with configurable polling interval
+- Structured logging to both console and file (`playlist_manager.log`)
 
-## Development Conventions
+### Key Design Decisions
+- **OAuth2 over API keys**: Required for playlist modification (insert/delete operations)
+- **Single-file architecture**: Simplifies deployment and Docker containerization
+- **Graceful degradation**: Video downloads succeed even if playlist moves fail
+- **No database**: Stateless - relies on YouTube API as source of truth
 
-### Python Style
-- Follow PEP 8 style guidelines
-- Use type hints for function signatures
-- Document functions with docstrings (Google or NumPy style)
+## Critical Workflows
 
-### Error Handling
-- Handle YouTube API rate limits gracefully
-- Implement retry logic for transient failures
-- Provide clear error messages for authentication issues
-
-### Configuration
-- Store OAuth2 credentials securely (never commit)
-- `client_secret.json`: OAuth2 client credentials from Google Cloud Console
-- `token.json`: Auto-generated OAuth2 tokens (created on first authentication)
-- Use `.env` file for local development (add to `.gitignore`)
-- Required env vars:
-  - `CREDENTIALS_FILE`: Path to OAuth2 client secret (default: `client_secret.json`)
-  - `TOKEN_FILE`: Path to store OAuth tokens (default: `token.json`)
-  - `TODO_PLAYLIST_ID`: Source playlist with videos to download
-  - `DONE_PLAYLIST_ID`: Destination playlist for completed downloads
-  - `DOWNLOAD_PATH`: Directory for saved videos (optional, default: `./downloads`)
-  - `POLL_INTERVAL`: Seconds between checks (optional, default: 300)
-  - `DOWNLOAD_MODE`: Download type - `video` (full video, default) or `audio` (audio-only, original format)
-
-## Key Workflows
-
-### Setup
+### Initial Setup & Authentication
 ```bash
-# Install dependencies
-pip install google-api-python-client google-auth google-auth-oauthlib yt-dlp python-dotenv
+# 1. Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Configure environment
-cp .env.example .env  # Edit with your playlist IDs
+# 2. Install dependencies
+pip install -r requirements.txt
 
-# Download OAuth2 credentials from Google Cloud Console
-# Save as client_secret.json
+# 3. Get OAuth2 credentials from Google Cloud Console (see OAUTH_SETUP.md)
+# 4. Save as client_secret.json
 
-# First run - authenticate (opens browser)
+# 5. Configure environment
+cp .env.example .env
+# Edit TODO_PLAYLIST_ID and DONE_PLAYLIST_ID
+
+# 6. First run - browser opens for OAuth2 authentication
 python manage_playlist.py
+# Grants: https://www.googleapis.com/auth/youtube scope
+# Creates: token.json (auto-refreshed on expiry)
 ```
 
-### Running
+### Docker Deployment Pattern
+
+**Option 1: Using CLIENT_SECRET_JSON (recommended for secrets management)**
 ```bash
-# Run once (process current todo playlist)
-python manage_playlist.py
+mkdir -p data downloads
 
-# Run continuously (monitor and auto-download)
-python manage_playlist.py --daemon
+# Set client secret as environment variable
+export CLIENT_SECRET_JSON='{"installed":{"client_id":"...","client_secret":"...","redirect_uris":["http://localhost"]}}'
+
+# Or add to .env file
+echo 'CLIENT_SECRET_JSON={"installed":{...}}' >> .env
+
+# First run - authentication
+docker-compose run --rm --service-ports yt-playlist
 ```
 
-### Download Process Flow
-1. Fetch all videos from TODO_PLAYLIST_ID
-2. For each video:
-   - Download using yt-dlp to DOWNLOAD_PATH
-   - On success: Remove from todo playlist, add to done playlist
-   - On failure: Log error, keep in todo playlist (retry next cycle)
-3. Sleep for POLL_INTERVAL, repeat
+**Option 2: Using file mount (traditional)**
+```bash
+mkdir -p data downloads
+cp client_secret.json data/
 
-## External Dependencies
+# First run - authentication (requires port forwarding)
+docker-compose run --rm --service-ports yt-playlist
+# Opens browser at localhost:8080/... for OAuth flow
 
-### Required Libraries
-- `google-api-python-client`: YouTube Data API v3 client for playlist manipulation
-- `google-auth`: Authentication handling
-- `google-auth-oauthlib`: OAuth2 flow for user authentication
-- `yt-dlp`: Video downloading (preferred over youtube-dl)
-- `python-dotenv`: Environment variable management
+# After token.json exists, run as daemon
+docker-compose up -d
 
-### API Considerations
-- YouTube Data API v3 has quota limits (10,000 units/day by default)
-- Playlist item operations:
-  - `playlistItems.list()`: 1 unit per request
-  - `playlistItems.insert()`: 50 units (adding to done playlist)
-  - `playlistItems.delete()`: 50 units (removing from todo playlist)
-- Each processed video costs ~101 units (list + insert + delete)
-- Cache playlist data to minimize redundant API calls
+# Volumes mounted:
+# - ./data → /app/data (credentials + tokens)
+# - ./downloads → /app/downloads (video files)
+```
 
-### yt-dlp Usage
+### CLI Arguments
+- `--daemon`: Continuous mode with POLL_INTERVAL sleeps (default: 5 seconds)
+- `--download-path PATH`: Override DOWNLOAD_PATH env var
+- `--poll-interval SECONDS`: Override POLL_INTERVAL env var
+- No args = run once and exit
+
+## Environment Variables
+
+From `.env.example`:
+```bash
+# OAuth2 credentials - use ONE of these methods:
+CLIENT_SECRET_JSON={"installed":{...}}  # Option 1: JSON string (Docker/CI/CD)
+CREDENTIALS_FILE=client_secret.json     # Option 2: File path (default)
+
+# Required configuration
+TODO_PLAYLIST_ID=PLxxxx...           # Source playlist (required)
+DONE_PLAYLIST_ID=PLyyyy...           # Destination playlist (required)
+
+# Optional configuration
+DOWNLOAD_PATH=./downloads            # Video storage directory
+POLL_INTERVAL=5                      # Seconds between checks (daemon mode)
+DOWNLOAD_MODE=video                  # 'video' or 'audio' (M4A format)
+```
+
+**Note**: `token.json` is auto-generated on first authentication and stored in the working directory. Advanced users can override with `TOKEN_FILE` environment variable if needed.
+
+**Client Secret Methods**:
+- **CLIENT_SECRET_JSON**: Full JSON content as string (useful for Docker secrets, CI/CD)
+- **CREDENTIALS_FILE**: Path to JSON file (default: `client_secret.json`)
+- Priority: Checks `CLIENT_SECRET_JSON` first, then falls back to file
+
+**Critical**: `POLL_INTERVAL=5` in production `.env` but `POLL_INTERVAL=300` in README examples - Docker uses env file value
+
+## YouTube API Quota Management
+
+**Daily Quota**: 10,000 units (default)
+**Per-video cost**: ~101 units
+- `playlistItems().list()`: 1 unit (paginated, maxResults=50)
+- `playlistItems().insert()`: 50 units (add to done)
+- `playlistItems().delete()`: 50 units (remove from todo)
+
+**Processing capacity**: ~99 videos/day with default quota
+
+**No caching implemented**: Each run_once() cycle re-fetches entire todo playlist.
+
+### Quota Optimization Opportunities
+Current implementation is stateless - potential optimizations if quota becomes constrained:
+
+1. **Local state tracking**: Store processed video IDs in a JSON file
+   - Skip `playlistItems().list()` call if no new videos expected
+   - Only query playlist when file modification indicates new additions
+
+2. **Conditional fetching**: Compare playlist item count before full fetch
+   - `playlists().list()` returns `contentDetails.itemCount` (1 unit)
+   - Only fetch items if count changed since last check
+
+3. **Partial pagination**: Stop fetching after finding last known video
+   - Requires ordered playlist assumption (newest first)
+   - Saves quota on large playlists
+
+4. **Batch operations**: Group playlist modifications
+   - Current: insert + delete per video (~100 units each)
+   - Alternative: Batch inserts, then batch deletes (same cost, fewer API calls)
+
+**Trade-off**: Caching adds state management complexity vs. stateless simplicity. Current quota limit (99 videos/day) sufficient for most use cases.
+
+## yt-dlp Configuration
+
+Mode selection via `DOWNLOAD_MODE` env var:
 ```python
-import yt_dlp
+# Video mode (default)
+'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
 
-# Full video download
-ydl_opts = {
-    'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-    'outtmpl': '%(title)s.%(ext)s',
-    'quiet': False,
-    'no_warnings': False,
-}
-
-# Audio-only download (original format, typically M4A)
-ydl_opts_audio = {
-    'format': 'bestaudio[ext=m4a]/bestaudio',
-    'outtmpl': '%(title)s.%(ext)s',
-}
-
-with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-    ydl.download([video_url])
+# Audio mode (original format, typically M4A)
+'format': 'bestaudio[ext=m4a]/bestaudio'
 ```
 
-## Code Patterns
+**Output template**: `'%(title)s.%(ext)s'` (no subdirectories)
+**Retry logic**: 10 retries for download + 10 for fragments
+**Certificate validation**: Disabled (`nocheckcertificate: True`)
 
-### API Client Initialization
+## OAuth2 Token Lifecycle
+
+### Token Files
+- `client_secret.json`: OAuth2 client credentials (manually downloaded, never auto-generated)
+- `token.json`: Access/refresh tokens (auto-generated on first auth, auto-refreshed)
+  - Default filename hardcoded, can be overridden with `TOKEN_FILE` env var if needed
+
+### Authentication Flow
+1. **First run**: No `token.json` exists
+   - Opens browser at `http://localhost:PORT/`
+   - User grants YouTube permissions
+   - Saves credentials to `token.json`
+
+2. **Subsequent runs**: `token.json` exists and valid
+   - Loads credentials from file (line 81)
+   - Validates token with `creds.valid` check (line 85)
+   - Silent execution, no browser interaction
+
+3. **Token expiry**: Access token expired but refresh token valid
+   - Auto-refreshes via `creds.refresh(Request())` (line 88)
+   - Updates `token.json` with new access token (line 103)
+   - No user interaction required
+
+4. **Token invalidation**: Refresh token revoked or corrupted
+   - Re-runs full OAuth flow via `InstalledAppFlow` (line 97)
+   - Opens browser for re-authentication
+
+### Debugging Authentication Issues
+```bash
+# Force re-authentication
+rm token.json
+python manage_playlist.py  # Browser will open
+
+# Check token validity
+python -c "from google.oauth2.credentials import Credentials; \
+  c = Credentials.from_authorized_user_file('token.json'); \
+  print(f'Valid: {c.valid}, Expired: {c.expired}')"
+
+# Common errors:
+# - "invalid_grant" → Delete token.json and re-authenticate
+# - "redirect_uri_mismatch" → Check Google Cloud Console OAuth settings
+# - Port already in use → OAuth flow picks random port automatically
+```
+
+## Error Handling Patterns
+
+### Authentication Failures
+- Missing `client_secret.json` → FileNotFoundError with setup instructions (line 92)
+- Expired token → Auto-refresh via `creds.refresh(Request())` (line 88)
+- Invalid token → Re-runs OAuth flow via `InstalledAppFlow` (line 97)
+
+### API Errors
+- HTTP 404 on playlist fetch → Logs 3 possible reasons (see lines 164-171)
+- Playlist modification fails → Warning logged, continues processing
+- Uses `googleapiclient.errors.HttpError` with status code inspection
+
+### Download Failures
+- yt-dlp exception → Logged, video stays in todo playlist for retry
+- Process continues to next video (no abort on single failure)
+
+## Code Conventions
+
+### Logging Strategy
+- **INFO**: Progress updates, successful operations
+- **DEBUG**: API request/response details (currently commented out)
+- **WARNING**: Non-fatal issues (e.g., playlist move fails after download)
+- **ERROR**: Failures requiring attention
+- Dual output: stdout + `playlist_manager.log` file
+
+### Type Hints
+Used for function signatures:
 ```python
-from googleapiclient.discovery import build
-
-youtube = build('youtube', 'v3', developerKey=API_KEY)
+def get_playlist_videos(self, playlist_id: str) -> List[Dict[str, str]]:
 ```
+Dictionary structure: `{'playlist_item_id': str, 'video_id': str, 'title': str, 'video_url': str}`
 
-### Playlist Operations
-- Use `playlists().list()` to fetch playlist metadata
-- Use `playlistItems().list()` to get videos in a playlist
-- Implement pagination for playlists with >50 videos (maxResults=50)
+### Configuration Validation
+`validate_config()` function (line 371) checks:
+- File existence: `CREDENTIALS_FILE`
+- Required env vars: `TODO_PLAYLIST_ID`, `DONE_PLAYLIST_ID`
+- Exits with status 1 if validation fails
 
-## Testing Strategy
-- Mock YouTube API responses for unit tests
-- Use pytest as the testing framework
-- Test error scenarios (invalid API key, non-existent playlist)
-- Mock yt-dlp downloads to avoid actual video downloads in tests
+## Docker Build & CI/CD
 
-## Future Enhancements to Consider
-- CLI argument parsing with `argparse` or `click`
-- Logging configuration for debugging API interactions and downloads
-- Systemd service file or Docker container for deployment
-- Progress notifications (email, webhook, Discord bot)
-- Download quality selection and format preferences
-- Concurrent downloads with rate limiting
+### Multi-platform Build
+GitHub Actions workflow (`.github/workflows/docker-build.yml`):
+- Builds for `linux/amd64` and `linux/arm64`
+- Pushes to `ghcr.io/l4r5/yt-playlist` on main branch
+- Tags: branch name, semver, SHA
+
+### Alpine-based Image
+- Base: `python:3.13-alpine`
+- System deps: `ffmpeg`, `gcc`, `musl-dev`, `linux-headers` (for compilation)
+- Entrypoint: `python manage_playlist.py`
+- Default CMD: `--daemon`
+
+## Testing Status
+**No tests currently implemented** (mentioned in instructions but not present in codebase)
+- Suggestions in instructions.md are aspirational
+- Would require mocking `googleapiclient` and `yt_dlp` modules
+
+## Common Debugging Commands
+```bash
+# Check logs in Docker
+docker-compose logs -f
+
+# Verify environment inside container
+docker-compose run --rm yt-playlist env
+
+# Manual authentication test
+python manage_playlist.py  # Should open browser
+
+# Check API quota usage (Google Cloud Console)
+# Navigate to: APIs & Services → Dashboard → YouTube Data API v3
+```

@@ -2,6 +2,8 @@
 
 Automated video downloader that monitors a YouTube "todo" playlist, downloads videos, and moves them to a "done" playlist for visibility.
 
+> **Note:** This project was created 100% by AI (GitHub Copilot & Claude), demonstrating AI-assisted software development capabilities.
+
 ## Features
 
 - 🎥 Automatically downloads videos from a monitored playlist

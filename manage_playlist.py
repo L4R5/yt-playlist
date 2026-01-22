@@ -8,6 +8,7 @@ Monitors a "todo" playlist, downloads videos, and moves them to a "done" playlis
 import os
 import sys
 import time
+import json
 import logging
 import argparse
 from pathlib import Path
@@ -27,6 +28,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configuration
+CLIENT_SECRET_JSON = os.getenv('CLIENT_SECRET_JSON')  # Optional: JSON string of client secret
 CREDENTIALS_FILE = os.getenv('CREDENTIALS_FILE', 'client_secret.json')
 TOKEN_FILE = os.getenv('TOKEN_FILE', 'token.json')
 TODO_PLAYLIST_ID = os.getenv('TODO_PLAYLIST_ID')
@@ -86,14 +88,28 @@ class PlaylistManager:
                 creds.refresh(Request())
             else:
                 logger.info("Starting OAuth2 authentication flow")
-                if not os.path.exists(self.credentials_file):
-                    logger.error(f"Credentials file not found: {self.credentials_file}")
-                    logger.error("Please download OAuth2 credentials from Google Cloud Console")
-                    logger.error("See README.md for instructions")
-                    raise FileNotFoundError(f"Credentials file not found: {self.credentials_file}")
                 
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.credentials_file, SCOPES)
+                # Try to load client secret from environment variable first
+                if CLIENT_SECRET_JSON:
+                    try:
+                        logger.info("Loading client secret from CLIENT_SECRET_JSON environment variable")
+                        client_config = json.loads(CLIENT_SECRET_JSON)
+                        flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse CLIENT_SECRET_JSON: {e}")
+                        raise ValueError("CLIENT_SECRET_JSON must be valid JSON") from e
+                # Fall back to file-based credentials
+                elif os.path.exists(self.credentials_file):
+                    logger.info(f"Loading client secret from file: {self.credentials_file}")
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        self.credentials_file, SCOPES)
+                else:
+                    logger.error("No client credentials found")
+                    logger.error(f"Either set CLIENT_SECRET_JSON environment variable or")
+                    logger.error(f"provide credentials file at: {self.credentials_file}")
+                    logger.error("See README.md for instructions")
+                    raise FileNotFoundError("Client credentials not found")
+                
                 creds = flow.run_local_server(port=0)  # Use random available port
                 logger.info("Authentication successful!")
             
@@ -362,12 +378,21 @@ def validate_config() -> bool:
     
     logger.info("Validating configuration...")
     
-    if not os.path.exists(CREDENTIALS_FILE):
-        errors.append(f"Credentials file not found: {CREDENTIALS_FILE}")
-        logger.error(f"✗ {CREDENTIALS_FILE} not found")
-        logger.error("  Download OAuth2 credentials from Google Cloud Console")
-    else:
+    # Check for either CLIENT_SECRET_JSON or credentials file
+    if CLIENT_SECRET_JSON:
+        logger.info(f"✓ CLIENT_SECRET_JSON environment variable set")
+        try:
+            json.loads(CLIENT_SECRET_JSON)
+            logger.info(f"✓ CLIENT_SECRET_JSON is valid JSON")
+        except json.JSONDecodeError:
+            errors.append("CLIENT_SECRET_JSON is not valid JSON")
+            logger.error(f"✗ CLIENT_SECRET_JSON contains invalid JSON")
+    elif os.path.exists(CREDENTIALS_FILE):
         logger.info(f"✓ Credentials file found: {CREDENTIALS_FILE}")
+    else:
+        errors.append(f"No client credentials found (neither CLIENT_SECRET_JSON nor {CREDENTIALS_FILE})")
+        logger.error(f"✗ No client credentials found")
+        logger.error(f"  Either set CLIENT_SECRET_JSON env var or provide {CREDENTIALS_FILE}")
     
     if not TODO_PLAYLIST_ID:
         errors.append("TODO_PLAYLIST_ID not set")
