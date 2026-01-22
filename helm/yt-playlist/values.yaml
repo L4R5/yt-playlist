@@ -30,19 +30,33 @@ serviceMonitor:
 # Ingress (not typically needed for background daemon)
 ingress:
   enabled: false
-  className: ""
-  annotations: {}
-    # kubernetes.io/ingress.class: nginx
-    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  className: "nginx"  # Or traefik, haproxy, etc.
+  annotations:
+    # For automatic certificate management with cert-manager
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # For NGINX-specific settings
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # For larger body size (video uploads)
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
   hosts:
     - host: yt-playlist.example.com
       paths:
         - path: /
           pathType: Prefix
-  tls: []
-  #  - secretName: yt-playlist-tls
-  #    hosts:
-  #      - yt-playlist.example.com
+  tls:
+    - secretName: yt-playlist-tls  # TLS certificate secret
+      hosts:
+        - yt-playlist.example.com
+  # Alternative: Multiple domains with separate certificates
+  # tls:
+  #   - secretName: yt-playlist-prod-tls
+  #     hosts:
+  #       - yt-playlist.example.com
+  #       - www.yt-playlist.example.com
+  #   - secretName: yt-playlist-metrics-tls
+  #     hosts:
+  #       - metrics.yt-playlist.example.com
 
 resources:
   limits:
@@ -147,15 +161,29 @@ auth:
       nodePort: null  # Set if using NodePort
     ingress:
       enabled: false
-      className: ""
-      annotations: {}
-        # cert-manager.io/cluster-issuer: letsencrypt-prod
+      className: "nginx"  # Or traefik, haproxy, etc.
+      annotations:
+        # For automatic certificate management with cert-manager
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+        # For NGINX-specific settings
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+        # Session affinity for OAuth flow
+        nginx.ingress.kubernetes.io/affinity: "cookie"
+        nginx.ingress.kubernetes.io/session-cookie-name: "auth-session"
+        nginx.ingress.kubernetes.io/session-cookie-max-age: "3600"
       hosts:
         - host: auth.yt-playlist.example.com
           paths:
             - path: /
               pathType: Prefix
-      tls: []
-      #  - secretName: yt-playlist-auth-tls
-      #    hosts:
-      #      - auth.yt-playlist.example.com
+      tls:
+        - secretName: yt-playlist-auth-tls  # TLS certificate secret
+          hosts:
+            - auth.yt-playlist.example.com
+      # Alternative: Wildcard certificate
+      # tls:
+      #   - secretName: wildcard-yt-playlist-tls
+      #     hosts:
+      #       - auth.yt-playlist.example.com
+      #       - app.yt-playlist.example.com

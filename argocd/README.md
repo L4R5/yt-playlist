@@ -127,7 +127,7 @@ source:
         todoPlaylistId: "PLxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
         donePlaylistId: "PLyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
       
-      clientSecretJson: '{"installed":{...}}'
+      existingSecret: yt-playlist-oauth-credentials
       
       downloadMode: video
       pollInterval: 300
@@ -142,18 +142,122 @@ source:
           enabled: true
           ingress:
             enabled: true
-            host: yt-auth.example.com
             className: nginx
+            annotations:
+              cert-manager.io/cluster-issuer: letsencrypt-prod
+              nginx.ingress.kubernetes.io/ssl-redirect: "true"
+              nginx.ingress.kubernetes.io/affinity: "cookie"
+            hosts:
+              - host: auth.yt-playlist.example.com
+                paths:
+                  - path: /
+                    pathType: Prefix
             tls:
-              - secretName: yt-auth-tls
+              - secretName: yt-playlist-auth-tls
                 hosts:
-                  - yt-auth.example.com
+                  - auth.yt-playlist.example.com
       
       metrics:
         enabled: true
         serviceMonitor:
           enabled: true
           interval: 30s
+```
+
+### TLS with cert-manager
+
+Using cert-manager for automatic certificate management:
+
+```yaml
+# 1. Install cert-manager (if not already installed)
+# kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
+
+# 2. Create ClusterIssuer for Let's Encrypt
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@example.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+
+# 3. Configure in ArgoCD Application
+auth:
+  ui:
+    ingress:
+      enabled: true
+      className: nginx
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+      hosts:
+        - host: auth.yt-playlist.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: yt-playlist-auth-tls  # Auto-created by cert-manager
+          hosts:
+            - auth.yt-playlist.example.com
+```
+
+### TLS with Manual Certificates
+
+Using pre-existing certificates:
+
+```bash
+# Create TLS secret from certificate files
+kubectl create secret tls yt-playlist-auth-tls \
+  --cert=path/to/tls.crt \
+  --key=path/to/tls.key \
+  --namespace=yt-playlist
+
+# Then configure ingress
+auth:
+  ui:
+    ingress:
+      enabled: true
+      className: nginx
+      hosts:
+        - host: auth.yt-playlist.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: yt-playlist-auth-tls
+          hosts:
+            - auth.yt-playlist.example.com
+```
+
+### TLS with Wildcard Certificates
+
+Using a single wildcard certificate for multiple subdomains:
+
+```yaml
+auth:
+  ui:
+    ingress:
+      enabled: true
+      className: nginx
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod-dns  # DNS challenge required for wildcards
+      hosts:
+        - host: auth.yt-playlist.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: wildcard-yt-playlist-tls
+          hosts:
+            - auth.yt-playlist.example.com
+            - app.yt-playlist.example.com
+            - "*.yt-playlist.example.com"
 ```
 
 ## Sync Policies
