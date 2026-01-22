@@ -2,6 +2,26 @@ apiVersion: v1
 entries:
   yt-playlist:
   - apiVersion: v2
+    appVersion: 1.0.25
+    created: "2026-01-22T19:25:09.747530974Z"
+    description: YouTube Playlist Manager - Automated video downloader with playlist
+      management
+    digest: 49f66b7c2b78ba1db074049cf92cc493f5c71208d4e7c3fdc374a26e34b5783f
+    home: https://github.com/L4R5/yt-playlist
+    keywords:
+    - youtube
+    - downloader
+    - playlist
+    - yt-dlp
+    maintainers:
+    - name: L4R5
+      url: https://github.com/L4R5
+    name: yt-playlist
+    type: application
+    urls:
+    - https://github.com/L4R5/yt-playlist/releases/download/yt-playlist-1.0.25/yt-playlist-1.0.25.tgz
+    version: 1.0.25
+  - apiVersion: v2
     appVersion: 1.0.24
     created: "2026-01-22T19:17:52.429763989Z"
     description: YouTube Playlist Manager - Automated video downloader with playlist
@@ -421,4 +441,4 @@ entries:
     urls:
     - https://github.com/L4R5/yt-playlist/releases/download/yt-playlist-1.0.3/yt-playlist-1.0.3.tgz
     version: 1.0.3
-generated: "2026-01-22T19:17:52.429872411Z"
+generated: "2026-01-22T19:25:09.747699847Z"
