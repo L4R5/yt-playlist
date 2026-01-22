@@ -34,6 +34,11 @@ spec:
         downloadMode: video  # Options: video, audio
         pollInterval: 300    # Seconds between playlist checks
         
+        # Logging Configuration
+        logging:
+          level: INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+          file: /tmp/playlist_manager.log
+        
         # Storage
         persistence:
           enabled: true

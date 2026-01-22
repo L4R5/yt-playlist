@@ -9,3 +9,5 @@ data:
   DONE_PLAYLIST_ID: {{ .Values.playlists.donePlaylistId | quote }}
   DOWNLOAD_MODE: {{ .Values.download.mode | quote }}
   POLL_INTERVAL: {{ .Values.download.pollInterval | quote }}
+  LOG_LEVEL: {{ .Values.logging.level | quote }}
+  LOG_FILE: {{ .Values.logging.file | quote }}

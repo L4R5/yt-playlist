@@ -29,7 +29,7 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
       - name: yt-playlist
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args:
           - "--daemon"
@@ -56,6 +56,16 @@ spec:
             configMapKeyRef:
               name: {{ include "yt-playlist.fullname" . }}
               key: POLL_INTERVAL
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: LOG_LEVEL
+        - name: LOG_FILE
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: LOG_FILE
         {{- if or .Values.clientSecretJson .Values.existingSecret }}
         - name: CLIENT_SECRET_JSON
           valueFrom:

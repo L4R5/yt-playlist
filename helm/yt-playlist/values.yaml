@@ -2,8 +2,8 @@
 
 image:
   repository: ghcr.io/l4r5/yt-playlist
-  tag: latest
-  pullPolicy: Always
+  tag: ""  # Defaults to Chart.AppVersion (1.0.8), override with --set image.tag=x.y.z
+  pullPolicy: IfNotPresent
 
 # Deployment configuration
 replicaCount: 1
@@ -92,6 +92,13 @@ download:
   mode: video
   # Poll interval in seconds (how often to check for new videos)
   pollInterval: 300
+
+# Logging configuration
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: INFO
+  # Log file path (container filesystem)
+  file: /tmp/playlist_manager.log
 
 # Persistent storage for downloaded videos
 persistence:

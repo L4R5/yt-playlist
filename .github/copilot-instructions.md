@@ -100,6 +100,8 @@ POLL_INTERVAL=5                      # Seconds between checks (daemon mode)
 DOWNLOAD_MODE=video                  # 'video' or 'audio' (M4A format)
 METRICS_PORT=8080                    # Prometheus metrics HTTP port
 DAILY_QUOTA_LIMIT=10000              # YouTube API daily quota limit
+LOG_LEVEL=INFO                       # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_FILE=/tmp/playlist_manager.log   # Log file path (writable location for containers)
 ```
 
 **Note**: `token.json` is auto-generated on first authentication and stored in the working directory. Advanced users can override with `TOKEN_FILE` environment variable if needed.

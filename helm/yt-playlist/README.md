@@ -22,19 +22,19 @@ helm repo update
 helm install yt-playlist yt-playlist/yt-playlist \
   --set playlists.todoPlaylistId=PLxxxx... \
   --set playlists.donePlaylistId=PLyyyy... \
-  --set clientSecretJson='{"installed":{"client_id":"...","client_secret":"...","redirect_uris":["http://localhost"]}}'
+  --set-string clientSecretJson="{\"installed\":{\"client_id\":\"...\",\"client_secret\":\"...\",\"redirect_uris\":[\"http://localhost\"]}}"
 
 # Method 2: From OCI registry
 helm install yt-playlist oci://ghcr.io/l4r5/charts/yt-playlist \
   --set playlists.todoPlaylistId=PLxxxx... \
   --set playlists.donePlaylistId=PLyyyy... \
-  --set clientSecretJson='{"installed":{...}}'
+  --set-string clientSecretJson="{\"installed\":{...}}"
 
 # Method 3: From source
 helm install yt-playlist ./helm/yt-playlist \
   --set playlists.todoPlaylistId=PLxxxx... \
   --set playlists.donePlaylistId=PLyyyy... \
-  --set clientSecretJson='{"installed":{...}}'
+  --set-string clientSecretJson="{\"installed\":{...}}"
 ```
 
 2. **Run initial authentication:**
@@ -86,9 +86,11 @@ helm upgrade yt-playlist ./helm/yt-playlist --set auth.enabled=false --reuse-val
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `image.repository` | Container image repository | `ghcr.io/l4r5/yt-playlist` |
-| `image.tag` | Container image tag | `latest` |
+| `image.tag` | Container image tag (defaults to Chart.AppVersion) | `""` |
 | `download.mode` | Download mode (video/audio) | `video` |
 | `download.pollInterval` | Polling interval in seconds | `300` |
+| `logging.level` | Log level (DEBUG/INFO/WARNING/ERROR/CRITICAL) | `INFO` |
+| `logging.file` | Log file path | `/tmp/playlist_manager.log` |
 | `persistence.enabled` | Enable persistent storage | `true` |
 | `persistence.size` | Storage size for downloads | `50Gi` |
 | `persistence.storageClass` | Storage class name | `""` (default) |
@@ -125,6 +127,11 @@ clientSecretJson: '{"installed":{"client_id":"YOUR_CLIENT_ID","client_secret":"Y
 download:
   mode: video  # or 'audio'
   pollInterval: 300
+
+# Logging
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: /tmp/playlist_manager.log
 
 # Storage
 persistence:
@@ -298,6 +305,12 @@ See [auth-ui/README.md](../../auth-ui/README.md) for more details.
 # View application logs
 kubectl logs -f deployment/yt-playlist
 
+# Enable debug logging (restart required)
+helm upgrade yt-playlist ./helm/yt-playlist \
+  --set logging.level=DEBUG \
+  --reuse-values
+kubectl rollout restart deployment/yt-playlist
+
 # Check pod status
 kubectl get pods -l app.kubernetes.io/name=yt-playlist
 
@@ -340,6 +353,29 @@ kubectl delete pvc yt-playlist-downloads
   - Can reuse the PVC by setting `persistence.existingClaim` in a new deployment
 
 ## Troubleshooting
+
+### Error: failed parsing --set data
+
+**Problem:** `Error: failed parsing --set data: key "}" has no value`
+
+**Cause:** Incorrect quote escaping. Single quotes don't allow escaping in bash.
+
+**Solution:** Use double quotes on the outside with escaped inner quotes:
+```bash
+# ✅ Correct - double quotes outside, escape inner quotes
+--set-string clientSecretJson="{\"installed\":{\"client_id\":\"...\",\"client_secret\":\"...\"}}"
+
+# ❌ Wrong - single quotes + escaping doesn't work (backslashes are literal)
+--set-string clientSecretJson='{\"installed\":{\"client_id\":\"...\"}}'
+
+# ✅ Best - use values file (strongly recommended for JSON)
+helm install yt-playlist ./helm/yt-playlist -f my-values.yaml
+```
+
+**In values file (use single quotes, no escaping needed):**
+```yaml
+clientSecretJson: '{"installed":{"client_id":"...","client_secret":"...","redirect_uris":["http://localhost"]}}'
+```
 
 ### OAuth Authentication Fails
 

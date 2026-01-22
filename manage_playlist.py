@@ -97,15 +97,19 @@ last_processing_timestamp = Gauge(
 )
 
 # Logging setup
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+LOG_FILE = os.getenv('LOG_FILE', '/tmp/playlist_manager.log')
+
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler('playlist_manager.log')
+        logging.FileHandler(LOG_FILE)
     ]
 )
 logger = logging.getLogger(__name__)
+logger.info(f"Logging configured: level={LOG_LEVEL}, file={LOG_FILE}")
 
 
 class QuotaTracker:

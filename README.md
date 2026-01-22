@@ -71,6 +71,10 @@ DONE_PLAYLIST_ID=PLyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
 DOWNLOAD_PATH=./downloads
 POLL_INTERVAL=300
 DOWNLOAD_MODE=video  # Options: 'video' or 'audio'
+
+# Optional: Logging
+LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_FILE=/tmp/playlist_manager.log
 ```
 
 **Using CLIENT_SECRET_JSON**: Copy the entire JSON content from your downloaded credentials file and set it as a single-line environment variable (escape quotes if needed for your shell).
