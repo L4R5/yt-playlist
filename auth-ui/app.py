@@ -120,7 +120,8 @@ def auth():
         
         authorization_url, state = flow.authorization_url(
             access_type='offline',
-            include_granted_scopes='true'
+            include_granted_scopes='true',
+            prompt='consent'  # Force consent screen to always get refresh_token
         )
         
         session['state'] = state
