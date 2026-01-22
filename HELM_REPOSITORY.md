@@ -2,6 +2,8 @@
 
 This repository publishes Helm charts automatically via GitHub Actions.
 
+> **Important**: GitHub Releases in this repository are **Helm chart versions**, not application versions. The chart version (e.g., `yt-playlist-1.0.4`) refers to the Kubernetes deployment configuration, not the YouTube playlist manager application itself. The application version is specified in the chart's `appVersion` field.
+
 ## Usage
 
 ### Method 1: GitHub Pages Repository (Recommended)
@@ -43,11 +45,19 @@ helm install yt-playlist ./helm/yt-playlist \
 
 ## Chart Versions
 
-The chart follows semantic versioning. Each release creates:
-- A GitHub Release with packaged chart (`.tgz`)
-- An entry in the Helm chart repository index
+The Helm chart follows semantic versioning independently from the application:
 
-View all releases: https://github.com/L4R5/yt-playlist/releases
+- **Chart Version** (e.g., `1.0.4`): Kubernetes deployment configuration changes
+- **App Version** (e.g., `latest`): The actual YouTube playlist manager Docker image
+
+Each Helm chart release creates:
+- A GitHub Release tagged with chart version (e.g., `yt-playlist-1.0.4`)
+- A packaged chart file (`.tgz`)
+- An updated Helm repository index
+
+**Note**: Chart version bumps occur when Kubernetes manifests, values, or deployment configuration change. Application updates use Docker image tags and do not require chart version changes.
+
+View all chart releases: https://github.com/L4R5/yt-playlist/releases
 
 ## Updating
 
@@ -80,12 +90,22 @@ helm install test helm/yt-playlist --dry-run --debug
 
 ### Versioning
 
-To publish a new chart version:
+To publish a new **Helm chart** release:
 
-1. Update `version` in `helm/yt-playlist/Chart.yaml`
-2. Update `appVersion` if application version changed
+1. Update `version` in `helm/yt-playlist/Chart.yaml` (increment for configuration changes)
+2. Update `appVersion` only if the application Docker image version changed
 3. Commit and push to main branch
-4. GitHub Actions will automatically create a release
+4. GitHub Actions will automatically create a **chart release**
+
+**When to bump chart version:**
+- Changed Kubernetes manifests (Deployment, Service, etc.)
+- Modified default values in `values.yaml`
+- Added/removed configuration options
+- Changed deployment behavior
+
+**When to bump appVersion only:**
+- Application code changes (managed via Docker image tags)
+- No chart/configuration changes needed
 
 Example:
 
@@ -93,8 +113,8 @@ Example:
 # helm/yt-playlist/Chart.yaml
 apiVersion: v2
 name: yt-playlist
-version: 1.1.0  # Increment this
-appVersion: "latest"
+version: 1.1.0      # Chart/configuration version
+appVersion: "latest" # Application Docker image tag
 ```
 
 ```bash
@@ -104,8 +124,8 @@ git push
 ```
 
 The workflow will:
-- Package the chart
-- Create a GitHub Release tagged `yt-playlist-1.1.0`
+- Package the Helm chart
+- Create a GitHub Release tagged `yt-playlist-1.1.0` **(chart version, not app version)**
 - Update the Helm repository index on the `gh-pages` branch
 
 **After the first workflow run**, enable GitHub Pages manually:

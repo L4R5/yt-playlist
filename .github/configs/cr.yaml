@@ -1,0 +1,31 @@
+# Chart Releaser Configuration
+# Configures automated Helm chart releases
+
+release-name-template: "{{ .Name }}-{{ .Version }}"
+
+release-notes-header: |
+  ## Helm Chart Release: {{ .Name }} v{{ .Version }}
+  
+  **⚠️ This is a HELM CHART release, not an application release.**
+  
+  This release contains Kubernetes deployment configuration updates. The application itself is deployed via Docker images with tags specified in the chart's `appVersion` field.
+  
+  ### Chart Information
+  - **Chart Version**: {{ .Version }}
+  - **App Version**: {{ .AppVersion }}
+  - **Description**: {{ .Description }}
+  
+  ### Installation
+  
+  ```bash
+  helm repo add yt-playlist https://l4r5.github.io/yt-playlist/
+  helm repo update
+  helm install yt-playlist yt-playlist/yt-playlist --version {{ .Version }}
+  ```
+  
+  ### What's in this chart release
+  
+  Changes to Kubernetes manifests, configuration options, or deployment behavior. For application code changes, see Docker image tags.
+
+# Do not mark failed releases as latest
+mark-as-latest: true

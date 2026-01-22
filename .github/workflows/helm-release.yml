@@ -37,6 +37,7 @@ jobs:
         with:
           charts_dir: helm
           skip_existing: true
+          config: .github/configs/cr.yaml
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           CR_SKIP_EXISTING: true

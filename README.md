@@ -210,6 +210,8 @@ kubectl port-forward svc/yt-playlist-auth-ui 5000:5000
 helm upgrade yt-playlist yt-playlist/yt-playlist --set auth.ui.enabled=false --reuse-values
 ```
 
+**Note**: The Helm repository publishes **chart versions** (deployment configuration), not application versions. See [HELM_REPOSITORY.md](HELM_REPOSITORY.md) for details on chart versioning vs. application versioning.
+
 See [helm/yt-playlist/README.md](helm/yt-playlist/README.md) for comprehensive Kubernetes deployment documentation.
 
 ### Docker Compose
