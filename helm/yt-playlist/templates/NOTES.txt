@@ -1,0 +1,100 @@
+YouTube Playlist Manager has been deployed!
+
+{{- if not .Values.playlists.todoPlaylistId }}
+
+⚠️  WARNING: You need to set the required playlist IDs!
+   
+   helm upgrade {{ .Release.Name }} ./helm/yt-playlist \
+     --set playlists.todoPlaylistId=PLxxxx... \
+     --set playlists.donePlaylistId=PLyyyy...
+
+{{- else }}
+
+Application Status:
+  Release Name: {{ .Release.Name }}
+  Namespace: {{ .Release.Namespace }}
+  
+Configuration:
+  TODO Playlist: {{ .Values.playlists.todoPlaylistId }}
+  DONE Playlist: {{ .Values.playlists.donePlaylistId }}
+  Download Mode: {{ .Values.download.mode }}
+  Poll Interval: {{ .Values.download.pollInterval }}s
+
+{{- if .Values.auth.enabled }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  INITIAL OAUTH2 AUTHENTICATION REQUIRED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+An authentication job has been created. Follow these steps:
+
+1. Port-forward the auth service:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "yt-playlist.fullname" . }}-auth 8080:8080
+
+2. Check job logs (it will open browser for OAuth):
+   kubectl logs -n {{ .Release.Namespace }} job/{{ include "yt-playlist.fullname" . }}-auth -f
+
+3. Complete OAuth in your browser
+
+4. After successful authentication, extract token.json:
+   kubectl get pod -n {{ .Release.Namespace }} -l job-name={{ include "yt-playlist.fullname" . }}-auth -o jsonpath='{.items[0].metadata.name}' | \
+   xargs -I {} kubectl cp -n {{ .Release.Namespace }} {}:/app/data/token.json ./token.json
+
+5. Create secret with token:
+   kubectl create secret generic {{ .Values.secretName }} \
+     -n {{ .Release.Namespace }} \
+     --from-literal=CLIENT_SECRET_JSON='{{ .Values.clientSecretJson }}' \
+     --from-file=token.json=./token.json \
+     --dry-run=client -o yaml | kubectl apply -f -
+
+6. Disable auth job and deploy main application:
+   helm upgrade {{ .Release.Name }} ./helm/yt-playlist \
+     --set auth.enabled=false \
+     --reuse-values
+
+{{- else if not .Values.existingTokenSecret }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  OAUTH2 TOKEN REQUIRED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You need to provide an OAuth2 token. Choose one method:
+
+METHOD 1: Run authentication job (recommended)
+  helm upgrade {{ .Release.Name }} ./helm/yt-playlist --set auth.enabled=true --reuse-values
+  (Then follow the instructions that will appear)
+
+METHOD 2: Authenticate locally and upload token
+  1. Run locally: python manage_playlist.py
+  2. Complete OAuth flow (creates token.json)
+  3. Create secret:
+     kubectl create secret generic {{ .Values.secretName }} \
+       -n {{ .Release.Namespace }} \
+       --from-literal=CLIENT_SECRET_JSON='YOUR_CLIENT_SECRET_JSON' \
+       --from-file=token.json=./token.json
+
+METHOD 3: Use existing secret
+  helm upgrade {{ .Release.Name }} ./helm/yt-playlist \
+    --set existingTokenSecret=your-secret-name \
+    --reuse-values
+
+{{- else }}
+
+✓ Using existing token secret: {{ .Values.existingTokenSecret }}
+
+{{- end }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  MONITORING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+View logs:
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "yt-playlist.name" . }} -f
+
+Check status:
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "yt-playlist.name" . }}
+
+Access downloads PVC:
+  kubectl exec -n {{ .Release.Namespace }} -it deployment/{{ include "yt-playlist.fullname" . }} -- ls -lh /app/downloads
+
+{{- end }}

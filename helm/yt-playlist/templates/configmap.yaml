@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "yt-playlist.fullname" . }}
+  labels:
+    {{- include "yt-playlist.labels" . | nindent 4 }}
+data:
+  TODO_PLAYLIST_ID: {{ .Values.playlists.todoPlaylistId | quote }}
+  DONE_PLAYLIST_ID: {{ .Values.playlists.donePlaylistId | quote }}
+  DOWNLOAD_MODE: {{ .Values.download.mode | quote }}
+  POLL_INTERVAL: {{ .Values.download.pollInterval | quote }}

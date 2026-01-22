@@ -117,9 +117,32 @@ python manage_playlist.py --download-path /path/to/videos
 # Custom poll interval (seconds)
 python manage_playlist.py --daemon --poll-interval 600
 
+# Custom metrics port
+python manage_playlist.py --metrics-port 9090
+
 # Combine options
 python manage_playlist.py --daemon --download-path ./my-videos --poll-interval 120
 ```
+
+## Monitoring
+
+The application exposes Prometheus metrics on port 8080 (configurable with `--metrics-port`):
+
+```bash
+# View metrics
+curl http://localhost:8080/metrics
+```
+
+**Available metrics:**
+- `yt_playlist_videos_processed_total` - Videos processed by status
+- `yt_playlist_downloads_total` - Download success/failure counts
+- `yt_playlist_api_calls_total` - YouTube API call counts by operation
+- `yt_playlist_api_quota_used` - Estimated API quota used today
+- `yt_playlist_api_quota_remaining` - Estimated remaining quota
+- `yt_playlist_todo_videos` - Current size of TODO playlist
+- `yt_playlist_processing_duration_seconds` - Operation timing histograms
+
+Metrics are compatible with Prometheus, Grafana, and other monitoring tools.
 
 ## How It Works
 

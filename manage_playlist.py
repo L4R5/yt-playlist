@@ -13,6 +13,7 @@ import logging
 import argparse
 from pathlib import Path
 from typing import List, Dict, Optional
+from threading import Thread
 
 import yt_dlp
 from googleapiclient.discovery import build
@@ -22,6 +23,7 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.oauth2.credentials import Credentials
 from dotenv import load_dotenv
+from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
 
 # Load environment variables
@@ -36,9 +38,63 @@ DONE_PLAYLIST_ID = os.getenv('DONE_PLAYLIST_ID')
 DOWNLOAD_PATH = Path(os.getenv('DOWNLOAD_PATH', './downloads'))
 POLL_INTERVAL = int(os.getenv('POLL_INTERVAL', 5))
 DOWNLOAD_MODE = os.getenv('DOWNLOAD_MODE', 'video').lower()  # 'video' or 'audio'
+METRICS_PORT = int(os.getenv('METRICS_PORT', 8080))
 
 # OAuth2 scopes for YouTube API
 SCOPES = ['https://www.googleapis.com/auth/youtube']
+
+# YouTube API quota costs (per operation)
+QUOTA_COSTS = {
+    'playlistItems.list': 1,
+    'playlistItems.insert': 50,
+    'playlistItems.delete': 50,
+}
+DAILY_QUOTA_LIMIT = int(os.getenv('DAILY_QUOTA_LIMIT', 10000))
+
+# Prometheus metrics
+videos_processed_total = Counter(
+    'yt_playlist_videos_processed_total',
+    'Total number of videos processed',
+    ['status']  # status: success, download_failed, api_failed
+)
+
+downloads_total = Counter(
+    'yt_playlist_downloads_total',
+    'Total number of video downloads attempted',
+    ['status']  # status: success, failed
+)
+
+api_calls_total = Counter(
+    'yt_playlist_api_calls_total',
+    'Total number of YouTube API calls',
+    ['operation']  # operation: list, insert, delete
+)
+
+api_quota_used = Gauge(
+    'yt_playlist_api_quota_used',
+    'Estimated YouTube API quota units used today'
+)
+
+api_quota_remaining = Gauge(
+    'yt_playlist_api_quota_remaining',
+    'Estimated YouTube API quota units remaining today'
+)
+
+playlist_videos_gauge = Gauge(
+    'yt_playlist_todo_videos',
+    'Current number of videos in TODO playlist'
+)
+
+processing_duration_seconds = Histogram(
+    'yt_playlist_processing_duration_seconds',
+    'Time spent processing videos',
+    ['operation']  # operation: download, api_call, full_cycle
+)
+
+last_processing_timestamp = Gauge(
+    'yt_playlist_last_processing_timestamp',
+    'Timestamp of last processing cycle'
+)
 
 # Logging setup
 logging.basicConfig(
@@ -50,6 +106,52 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+
+class QuotaTracker:
+    """Track YouTube API quota usage."""
+    
+    def __init__(self):
+        self.used = 0
+        self.reset_time = self._get_next_reset_time()
+    
+    def _get_next_reset_time(self):
+        """Get timestamp of next quota reset (midnight Pacific Time)."""
+        from datetime import datetime, timedelta
+        import pytz
+        
+        pacific = pytz.timezone('America/Los_Angeles')
+        now = datetime.now(pacific)
+        tomorrow = now + timedelta(days=1)
+        midnight = tomorrow.replace(hour=0, minute=0, second=0, microsecond=0)
+        return midnight.timestamp()
+    
+    def add_usage(self, operation: str):
+        """Record API operation and update quota usage."""
+        # Check if we need to reset (new day)
+        if time.time() >= self.reset_time:
+            logger.info("Quota reset - new day started")
+            self.used = 0
+            self.reset_time = self._get_next_reset_time()
+        
+        cost = QUOTA_COSTS.get(operation, 0)
+        self.used += cost
+        
+        # Update Prometheus metrics
+        api_quota_used.set(self.used)
+        api_quota_remaining.set(max(0, DAILY_QUOTA_LIMIT - self.used))
+        
+        logger.debug(f"Quota: {operation} cost {cost} units (total: {self.used}/{DAILY_QUOTA_LIMIT})")
+    
+    def get_remaining(self):
+        """Get remaining quota units."""
+        if time.time() >= self.reset_time:
+            return DAILY_QUOTA_LIMIT
+        return max(0, DAILY_QUOTA_LIMIT - self.used)
+
+
+# Global quota tracker
+quota_tracker = QuotaTracker()
 
 
 class PlaylistManager:
@@ -154,7 +256,14 @@ class PlaylistManager:
                     pageToken=next_page_token
                 )
                 logger.debug(f"Making API request to playlistItems.list with playlistId={playlist_id}")
-                response = request.execute()
+                
+                with processing_duration_seconds.labels(operation='api_call').time():
+                    response = request.execute()
+                
+                # Track API usage
+                api_calls_total.labels(operation='list').inc()
+                quota_tracker.add_usage('playlistItems.list')
+                
                 logger.debug(f"API response received. Items count: {len(response.get('items', []))}")
                 
                 for item in response.get('items', []):
@@ -170,6 +279,7 @@ class PlaylistManager:
                     break
             
             logger.info(f"Retrieved {len(videos)} videos from playlist {playlist_id}")
+            playlist_videos_gauge.set(len(videos))
             return videos
             
         except HttpError as e:
@@ -216,13 +326,19 @@ class PlaylistManager:
         
         try:
             logger.info(f"Starting download: {video['title']}")
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([video['video_url']])
+            downloads_total.labels(status='attempted').inc()
+            
+            with processing_duration_seconds.labels(operation='download').time():
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([video['video_url']])
+            
             logger.info(f"Successfully downloaded: {video['title']}")
+            downloads_total.labels(status='success').inc()
             return True
             
         except Exception as e:
             logger.error(f"Failed to download {video['title']}: {e}")
+            downloads_total.labels(status='failed').inc()
             return False
     
     def remove_from_playlist(self, playlist_item_id: str) -> bool:
@@ -237,6 +353,11 @@ class PlaylistManager:
         """
         try:
             self.youtube.playlistItems().delete(id=playlist_item_id).execute()
+            
+            # Track API usage
+            api_calls_total.labels(operation='delete').inc()
+            quota_tracker.add_usage('playlistItems.delete')
+            
             logger.info(f"Removed playlist item {playlist_item_id}")
             return True
             
@@ -271,6 +392,10 @@ class PlaylistManager:
                 body=request_body
             ).execute()
             
+            # Track API usage
+            api_calls_total.labels(operation='insert').inc()
+            quota_tracker.add_usage('playlistItems.insert')
+            
             logger.info(f"Added video {video_id} to playlist {playlist_id}")
             return True
             
@@ -298,14 +423,17 @@ class PlaylistManager:
         # Step 2: Add to done playlist
         if not self.add_to_playlist(self.done_playlist_id, video['video_id']):
             logger.warning(f"Downloaded but failed to add to done playlist: {video['title']}")
+            videos_processed_total.labels(status='api_failed').inc()
             # Continue anyway - video is downloaded
         
         # Step 3: Remove from todo playlist
         if not self.remove_from_playlist(video['playlist_item_id']):
             logger.warning(f"Downloaded but failed to remove from todo playlist: {video['title']}")
+            videos_processed_total.labels(status='api_failed').inc()
             return False
         
         logger.info(f"Successfully processed: {video['title']}")
+        videos_processed_total.labels(status='success').inc()
         return True
     
     def run_once(self, download_path: Path) -> None:
@@ -320,7 +448,10 @@ class PlaylistManager:
         logger.info(f"TODO Playlist ID: {self.todo_playlist_id}")
         logger.info(f"DONE Playlist ID: {self.done_playlist_id}")
         logger.info(f"Download Path: {download_path}")
+        logger.info(f"API Quota Used: {quota_tracker.used}/{DAILY_QUOTA_LIMIT} ({quota_tracker.get_remaining()} remaining)")
         logger.info("="*60)
+        
+        cycle_start = time.time()
         
         # Ensure download directory exists
         download_path.mkdir(parents=True, exist_ok=True)
@@ -330,6 +461,7 @@ class PlaylistManager:
         
         if not videos:
             logger.info("No videos in todo playlist")
+            last_processing_timestamp.set(time.time())
             return
         
         logger.info(f"Found {len(videos)} videos to process")
@@ -337,12 +469,19 @@ class PlaylistManager:
         # Process each video
         for video in videos:
             try:
-                self.process_video(video, download_path)
+                with processing_duration_seconds.labels(operation='full_cycle').time():
+                    success = self.process_video(video, download_path)
+                    if not success:
+                        videos_processed_total.labels(status='download_failed').inc()
             except Exception as e:
                 logger.error(f"Unexpected error processing {video['title']}: {e}")
+                videos_processed_total.labels(status='download_failed').inc()
                 # Continue with next video
         
-        logger.info("Playlist processing cycle complete")
+        cycle_duration = time.time() - cycle_start
+        logger.info(f"Playlist processing cycle complete (took {cycle_duration:.1f}s)")
+        logger.info(f"API Quota Used: {quota_tracker.used}/{DAILY_QUOTA_LIMIT} ({quota_tracker.get_remaining()} remaining)")
+        last_processing_timestamp.set(time.time())
     
     def run_daemon(self, download_path: Path, poll_interval: int) -> None:
         """
@@ -437,8 +576,23 @@ def main():
         default=POLL_INTERVAL,
         help=f'Seconds between checks in daemon mode (default: {POLL_INTERVAL})'
     )
+    parser.add_argument(
+        '--metrics-port',
+        type=int,
+        default=METRICS_PORT,
+        help=f'Port for Prometheus metrics endpoint (default: {METRICS_PORT})'
+    )
     
     args = parser.parse_args()
+    
+    # Start Prometheus metrics server
+    try:
+        start_http_server(args.metrics_port)
+        logger.info(f"Prometheus metrics server started on port {args.metrics_port}")
+        logger.info(f"Metrics available at http://localhost:{args.metrics_port}/metrics")
+    except OSError as e:
+        logger.warning(f"Could not start metrics server on port {args.metrics_port}: {e}")
+        logger.warning("Continuing without metrics endpoint")
     
     # Validate configuration
     if not validate_config():

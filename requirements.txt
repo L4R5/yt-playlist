@@ -4,3 +4,5 @@ google-auth-oauthlib>=1.1.0
 google-auth-httplib2>=0.1.0
 yt-dlp>=2023.10.13
 python-dotenv>=1.0.0
+prometheus-client>=0.19.0
+pytz>=2023.3

@@ -98,6 +98,8 @@ DONE_PLAYLIST_ID=PLyyyy...           # Destination playlist (required)
 DOWNLOAD_PATH=./downloads            # Video storage directory
 POLL_INTERVAL=5                      # Seconds between checks (daemon mode)
 DOWNLOAD_MODE=video                  # 'video' or 'audio' (M4A format)
+METRICS_PORT=8080                    # Prometheus metrics HTTP port
+DAILY_QUOTA_LIMIT=10000              # YouTube API daily quota limit
 ```
 
 **Note**: `token.json` is auto-generated on first authentication and stored in the working directory. Advanced users can override with `TOKEN_FILE` environment variable if needed.
@@ -119,7 +121,31 @@ DOWNLOAD_MODE=video                  # 'video' or 'audio' (M4A format)
 
 **Processing capacity**: ~99 videos/day with default quota
 
-**No caching implemented**: Each run_once() cycle re-fetches entire todo playlist.
+**Quota tracking**: Implemented via `QuotaTracker` class
+- Automatically resets at midnight Pacific Time (YouTube's quota reset time)
+- Tracks all API operations and their costs
+- Exposes metrics via Prometheus (`api_quota_used`, `api_quota_remaining`)
+- Logs quota usage at start/end of each processing cycle
+
+## Prometheus Metrics
+
+The application exposes metrics on port 8080 (configurable via `METRICS_PORT`):
+
+**Counters:**
+- `yt_playlist_videos_processed_total{status}` - Videos processed (success/download_failed/api_failed)
+- `yt_playlist_downloads_total{status}` - Downloads attempted (success/failed)
+- `yt_playlist_api_calls_total{operation}` - API calls (list/insert/delete)
+
+**Gauges:**
+- `yt_playlist_api_quota_used` - Estimated quota units used today
+- `yt_playlist_api_quota_remaining` - Estimated quota units remaining
+- `yt_playlist_todo_videos` - Current videos in TODO playlist
+- `yt_playlist_last_processing_timestamp` - Unix timestamp of last cycle
+
+**Histograms:**
+- `yt_playlist_processing_duration_seconds{operation}` - Operation duration (download/api_call/full_cycle)
+
+Access metrics: `http://localhost:8080/metrics`
 
 ### Quota Optimization Opportunities
 Current implementation is stateless - potential optimizations if quota becomes constrained:

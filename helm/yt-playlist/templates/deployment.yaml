@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "yt-playlist.fullname" . }}
+  labels:
+    {{- include "yt-playlist.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "yt-playlist.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "yt-playlist.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "yt-playlist.serviceAccountName" . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: yt-playlist
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args:
+          - "--daemon"
+          - "--poll-interval"
+          - "{{ .Values.download.pollInterval }}"
+        env:
+        - name: TODO_PLAYLIST_ID
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: TODO_PLAYLIST_ID
+        - name: DONE_PLAYLIST_ID
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: DONE_PLAYLIST_ID
+        - name: DOWNLOAD_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: DOWNLOAD_MODE
+        - name: POLL_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: POLL_INTERVAL
+        {{- if .Values.clientSecretJson }}
+        - name: CLIENT_SECRET_JSON
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secretName }}
+              key: CLIENT_SECRET_JSON
+        {{- end }}
+        - name: TOKEN_FILE
+          value: "/app/data/token.json"
+        - name: DOWNLOAD_PATH
+          value: "/app/downloads"
+        {{- if .Values.service.enabled }}
+        ports:
+        - name: metrics
+          containerPort: {{ .Values.service.port }}
+          protocol: TCP
+        {{- end }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        volumeMounts:
+        - name: downloads
+          mountPath: /app/downloads
+        - name: data
+          mountPath: /app/data
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+      volumes:
+      - name: downloads
+        {{- if .Values.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ if .Values.persistence.existingClaim }}{{ .Values.persistence.existingClaim }}{{ else }}{{ include "yt-playlist.fullname" . }}-downloads{{ end }}
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+      - name: data
+        secret:
+          secretName: {{ .Values.existingTokenSecret | default .Values.secretName }}
+          optional: true
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

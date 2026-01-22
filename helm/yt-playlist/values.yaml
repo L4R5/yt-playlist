@@ -1,0 +1,126 @@
+# Default values for yt-playlist Helm chart
+
+image:
+  repository: ghcr.io/l4r5/yt-playlist
+  tag: latest
+  pullPolicy: Always
+
+# Deployment configuration
+replicaCount: 1
+
+# Service (for metrics endpoint)
+service:
+  enabled: true  # Metrics endpoint is available on port 8080
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+
+# ServiceMonitor for Prometheus Operator
+serviceMonitor:
+  enabled: false  # Requires Prometheus Operator CRDs
+  interval: 30s
+  path: /metrics
+  scrapeTimeout: 10s
+  additionalLabels: {}
+  # additionalLabels:
+  #   prometheus: kube-prometheus
+  relabelings: []
+  metricRelabelings: []
+
+# Ingress (not typically needed for background daemon)
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: yt-playlist.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: yt-playlist-tls
+  #    hosts:
+  #      - yt-playlist.example.com
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# OAuth2 authentication
+# Option 1: Provide client secret JSON directly (for initial setup)
+# clientSecretJson: '{"installed":{"client_id":"...","client_secret":"...","redirect_uris":["http://localhost"]}}'
+
+# Option 2: Reference existing secret containing token.json (after initial auth)
+# existingTokenSecret: yt-playlist-token
+
+# OAuth2 credentials secret name (auto-generated if not using existingTokenSecret)
+secretName: yt-playlist-credentials
+
+# YouTube playlist configuration (REQUIRED)
+playlists:
+  # Source playlist with videos to download
+  todoPlaylistId: ""
+  # Destination playlist for completed downloads
+  donePlaylistId: ""
+
+# Download configuration
+download:
+  # Download mode: 'video' (full video) or 'audio' (audio-only)
+  mode: video
+  # Poll interval in seconds (how often to check for new videos)
+  pollInterval: 300
+
+# Persistent storage for downloaded videos
+persistence:
+  enabled: true
+  storageClass: ""  # Use default storage class if empty
+  accessMode: ReadWriteOnce
+  size: 50Gi
+  # Existing PVC name (if you want to use pre-created PVC)
+  existingClaim: ""
+
+# Service account
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 1000
+
+# Container security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Initial authentication job
+auth:
+  # Enable authentication job for first-time OAuth setup
+  enabled: false
+  # Service type for OAuth callback (use NodePort or LoadBalancer for external access)
+  serviceType: ClusterIP
+  # NodePort for OAuth callback (only used if serviceType is NodePort)
+  nodePort: 30080
