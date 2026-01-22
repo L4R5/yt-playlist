@@ -37,7 +37,9 @@ pip install -r requirements.txt
 7. Application type: **Desktop app**
 8. Name it (e.g., "Playlist Manager Client")
 9. Download the JSON file
-10. Save it as `client_secret.json` in the project directory
+10. **Choose one of these methods:**
+    - **Method A (File)**: Save it as `client_secret.json` in the project directory
+    - **Method B (Environment Variable)**: Copy the JSON content to use as `CLIENT_SECRET_JSON` (see step 4)
 
 ### 3. Get Playlist IDs
 
@@ -54,14 +56,24 @@ cp .env.example .env
 
 Example `.env`:
 ```bash
+# OAuth2 credentials - use ONE of these methods:
+# Method A: File path (traditional)
 CREDENTIALS_FILE=client_secret.json
-TOKEN_FILE=token.json
+
+# Method B: JSON string (useful for Docker/CI/CD)
+# CLIENT_SECRET_JSON={"installed":{"client_id":"...","client_secret":"...","redirect_uris":["http://localhost"]}}
+
+# Required: Your playlist IDs
 TODO_PLAYLIST_ID=PLxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 DONE_PLAYLIST_ID=PLyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+
+# Optional: Download configuration
 DOWNLOAD_PATH=./downloads
 POLL_INTERVAL=300
 DOWNLOAD_MODE=video  # Options: 'video' or 'audio'
 ```
+
+**Using CLIENT_SECRET_JSON**: Copy the entire JSON content from your downloaded credentials file and set it as a single-line environment variable (escape quotes if needed for your shell).
 
 ### Download Modes
 
@@ -195,7 +207,16 @@ docker build -t yt-playlist .
 # Or use pre-built image
 docker pull ghcr.io/l4r5/yt-playlist:latest
 
-# Run once (with authentication)
+# Method A: Using CLIENT_SECRET_JSON (no file needed)
+docker run --rm -it \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/downloads:/app/downloads \
+  -e CLIENT_SECRET_JSON='{"installed":{"client_id":"...","client_secret":"...","redirect_uris":["http://localhost"]}}' \
+  -e TODO_PLAYLIST_ID=PLxxxx \
+  -e DONE_PLAYLIST_ID=PLyyyy \
+  yt-playlist
+
+# Method B: Using file mount (requires client_secret.json in ./data/)
 docker run --rm -it \
   -v $(pwd)/data:/app/data \
   -v $(pwd)/downloads:/app/downloads \
@@ -203,12 +224,13 @@ docker run --rm -it \
   -e DONE_PLAYLIST_ID=PLyyyy \
   yt-playlist
 
-# Run as daemon
+# Run as daemon (after authentication, add --daemon)
 docker run -d \
   --name youtube-playlist-manager \
   --restart unless-stopped \
   -v $(pwd)/data:/app/data \
   -v $(pwd)/downloads:/app/downloads \
+  -e CLIENT_SECRET_JSON='{"installed":{...}}' \
   -e TODO_PLAYLIST_ID=PLxxxx \
   -e DONE_PLAYLIST_ID=PLyyyy \
   yt-playlist --daemon
