@@ -163,8 +163,8 @@ auth:
     redirectUri: ""
     image:
       repository: ghcr.io/l4r5/yt-playlist-auth-ui
-      tag: latest
-      pullPolicy: Always
+      tag: ""  # Defaults to Chart.AppVersion, override with --set auth.ui.image.tag=x.y.z
+      pullPolicy: IfNotPresent
     resources:
       limits:
         cpu: 200m

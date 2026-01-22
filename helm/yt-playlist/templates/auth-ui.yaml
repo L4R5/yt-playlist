@@ -64,7 +64,7 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
       - name: auth-ui
-        image: "{{ .Values.auth.ui.image.repository }}:{{ .Values.auth.ui.image.tag }}"
+        image: "{{ .Values.auth.ui.image.repository }}:{{ .Values.auth.ui.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.auth.ui.image.pullPolicy }}
         ports:
         - name: http
