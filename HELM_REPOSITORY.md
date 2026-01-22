@@ -28,24 +28,7 @@ Search available versions:
 helm search repo yt-playlist
 ```
 
-### Method 2: OCI Registry (GitHub Container Registry)
-
-Install directly from OCI registry:
-
-```bash
-helm install yt-playlist oci://ghcr.io/l4r5/charts/yt-playlist --version 1.0.0 \
-  --set playlists.todoPlaylistId=PLxxxx \
-  --set playlists.donePlaylistId=PLyyyy \
-  --set clientSecretJson='{"installed":{...}}'
-```
-
-List available versions:
-
-```bash
-helm show chart oci://ghcr.io/l4r5/charts/yt-playlist
-```
-
-### Method 3: From Source
+### Method 2: From Source
 
 Clone the repository and install locally:
 
@@ -63,19 +46,14 @@ helm install yt-playlist ./helm/yt-playlist \
 The chart follows semantic versioning. Each release creates:
 - A GitHub Release with packaged chart (`.tgz`)
 - An entry in the Helm chart repository index
-- An OCI artifact in GitHub Container Registry
 
 View all releases: https://github.com/L4R5/yt-playlist/releases
 
 ## Updating
 
 ```bash
-# Using Helm repository
 helm repo update
 helm upgrade yt-playlist yt-playlist/yt-playlist
-
-# Using OCI registry
-helm upgrade yt-playlist oci://ghcr.io/l4r5/charts/yt-playlist --version <new-version>
 ```
 
 ## Chart Documentation
@@ -129,7 +107,6 @@ The workflow will:
 - Package the chart
 - Create a GitHub Release tagged `yt-playlist-1.1.0`
 - Update the Helm repository index on the `gh-pages` branch
-- Push OCI artifact to ghcr.io
 
 **After the first workflow run**, enable GitHub Pages manually:
 1. Go to: https://github.com/L4R5/yt-playlist/settings/pages
@@ -164,12 +141,6 @@ yt-playlist/
    - Source: Deploy from a branch → gh-pages → / (root)
 3. Wait a few minutes for GitHub Pages to deploy
 4. Run `helm repo update`
-
-### OCI Push Failed
-
-Ensure GitHub Container Registry permissions are set:
-- Repository Settings → Actions → General
-- Workflow permissions: "Read and write permissions"
 
 ### Chart Validation Failed
 

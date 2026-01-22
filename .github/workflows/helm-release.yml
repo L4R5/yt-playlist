@@ -46,21 +46,8 @@ jobs:
           # Check out gh-pages branch (chart-releaser creates it)
           git fetch origin gh-pages || true
           if git rev-parse --verify origin/gh-pages; then
-            echo "gh-pages branch exists, GitHub Pages will be automatically configured"
-            echo "Visit: https://github.com/${{ github.repository }}/settings/pages to verify"
+            echo "✅ gh-pages branch exists"
+            echo "📝 Enable GitHub Pages manually (one-time setup):"
+            echo "   https://github.com/${{ github.repository }}/settings/pages"
+            echo "   Source: Deploy from a branch → gh-pages → / (root) → Save"
           fi
-
-      - name: Upload chart to GitHub Container Registry
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
-          
-          # Package and push chart as OCI artifact
-          cd helm/yt-playlist
-          helm package .
-          CHART_VERSION=$(grep '^version:' Chart.yaml | awk '{print $2}')
-          
-          # Convert owner to lowercase for OCI registry
-          OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          helm push yt-playlist-${CHART_VERSION}.tgz oci://ghcr.io/${OWNER_LOWER}/charts
-          
-          echo "Chart published to: oci://ghcr.io/${OWNER_LOWER}/charts/yt-playlist:${CHART_VERSION}"
