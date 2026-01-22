@@ -10,6 +10,7 @@ import os
 import json
 import logging
 from flask import Flask, render_template, request, redirect, url_for, session
+from werkzeug.middleware.proxy_fix import ProxyFix
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from kubernetes import client, config
@@ -25,6 +26,10 @@ REDIRECT_URI = os.getenv('REDIRECT_URI', None)  # Optional: explicit redirect UR
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
+
+# Trust proxy headers (X-Forwarded-Proto, X-Forwarded-Host) from ingress
+# This allows Flask to correctly detect HTTPS when behind a reverse proxy
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
