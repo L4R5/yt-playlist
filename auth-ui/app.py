@@ -56,7 +56,7 @@ def save_token_to_file(token_json: str):
         logger.info(f"Saved token to {token_file}")
         return True
     except Exception as e:
-        logger.error(f"Failed to save token to Kubernetes: {e}")
+        logger.error(f"Failed to save token to file: {e}")
         return False
 
 
