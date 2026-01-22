@@ -1,0 +1,93 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: yt-playlist
+  namespace: argocd
+spec:
+  generators:
+    # List generator for multiple environments
+    - list:
+        elements:
+          - env: dev
+            namespace: yt-playlist-dev
+            chartVersion: 1.0.6
+            todoPlaylist: PLxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+            donePlaylist: PLyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+            pollInterval: "60"
+            replicaCount: "1"
+            
+          - env: staging
+            namespace: yt-playlist-staging
+            chartVersion: 1.0.6
+            todoPlaylist: PLstaging_xxxxxxxxxxxxxxxxxxxx
+            donePlaylist: PLstaging_yyyyyyyyyyyyyyyyyyyy
+            pollInterval: "300"
+            replicaCount: "1"
+            
+          - env: prod
+            namespace: yt-playlist
+            chartVersion: 1.0.6
+            todoPlaylist: PLprod_xxxxxxxxxxxxxxxxxxxxx
+            donePlaylist: PLprod_yyyyyyyyyyyyyyyyyyyyyy
+            pollInterval: "300"
+            replicaCount: "1"
+  
+  template:
+    metadata:
+      name: 'yt-playlist-{{env}}'
+      labels:
+        app: yt-playlist
+        environment: '{{env}}'
+    
+    spec:
+      project: default
+      
+      source:
+        repoURL: https://l4r5.github.io/yt-playlist/
+        chart: yt-playlist
+        targetRevision: '{{chartVersion}}'
+        helm:
+          releaseName: yt-playlist
+          values: |
+            playlists:
+              todoPlaylistId: "{{todoPlaylist}}"
+              donePlaylistId: "{{donePlaylist}}"
+            
+            # Use environment-specific secrets
+            clientSecret:
+              enabled: true
+              existingSecret: "yt-playlist-client-secret-{{env}}"
+            
+            downloadMode: video
+            pollInterval: {{pollInterval}}
+            replicaCount: {{replicaCount}}
+            
+            persistence:
+              enabled: true
+              size: 10Gi
+            
+            auth:
+              ui:
+                enabled: false  # Enable manually for initial setup
+            
+            metrics:
+              enabled: true
+              serviceMonitor:
+                enabled: true
+      
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+      
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m

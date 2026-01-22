@@ -214,6 +214,17 @@ helm upgrade yt-playlist yt-playlist/yt-playlist --set auth.ui.enabled=false --r
 
 See [helm/yt-playlist/README.md](helm/yt-playlist/README.md) for comprehensive Kubernetes deployment documentation.
 
+### ArgoCD (GitOps)
+
+Deploy using ArgoCD for continuous delivery:
+
+```bash
+# Apply ArgoCD Application
+kubectl apply -f argocd/application.yaml
+```
+
+For multi-environment deployments with ApplicationSets, see [argocd/README.md](argocd/README.md).
+
 ### Docker Compose
 
 **Steps:**
