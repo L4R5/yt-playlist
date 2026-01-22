@@ -1,11 +1,12 @@
 FROM python:3.13-alpine
 
-# Install system dependencies
+# Install system dependencies including Node.js for YouTube challenge solving
 RUN apk add --no-cache \
     ffmpeg \
     gcc \
     musl-dev \
-    linux-headers
+    linux-headers \
+    nodejs
 
 # Set working directory
 WORKDIR /app
