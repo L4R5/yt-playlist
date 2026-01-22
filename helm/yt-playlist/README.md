@@ -143,9 +143,47 @@ helm install yt-playlist ./helm/yt-playlist -f custom-values.yaml
 
 ## Authentication Methods
 
-### Method 1: Authentication Job (Recommended)
+### Method 1: Web UI (Recommended) - No Command Line Required!
 
-Best for: First-time setup in Kubernetes
+Best for: Easy, user-friendly authentication
+
+```bash
+# 1. Deploy with auth UI enabled
+helm install yt-playlist ./helm/yt-playlist \
+  --set auth.ui.enabled=true \
+  --set playlists.todoPlaylistId=PLxxxx \
+  --set playlists.donePlaylistId=PLyyyy \
+  --set clientSecretJson='{"installed":{...}}'
+
+# 2. Access the web interface
+kubectl port-forward svc/yt-playlist-auth-ui 5000:5000
+# Open http://localhost:5000 in your browser
+
+# 3. Click "Authenticate with Google" and grant permissions
+# Token is automatically saved!
+
+# 4. Disable auth UI and start main app
+helm upgrade yt-playlist ./helm/yt-playlist \
+  --set auth.ui.enabled=false \
+  --reuse-values
+```
+
+**With Ingress (for production):**
+```bash
+helm install yt-playlist ./helm/yt-playlist \
+  --set auth.ui.enabled=true \
+  --set auth.ui.ingress.enabled=true \
+  --set auth.ui.ingress.hosts[0].host=auth.example.com \
+  --set playlists.todoPlaylistId=PLxxxx \
+  --set playlists.donePlaylistId=PLyyyy \
+  --set clientSecretJson='{"installed":{...}}'
+
+# Open https://auth.example.com and authenticate
+```
+
+### Method 2: Authentication Job (Command Line)
+
+Best for: First-time setup in Kubernetes (requires kubectl)
 
 1. Deploy with `auth.enabled=true`
 2. Port-forward the auth service
@@ -156,7 +194,7 @@ Best for: First-time setup in Kubernetes
 
 See [Quick Start](#quick-start) for detailed steps.
 
-### Method 2: Pre-authenticate Locally
+### Method 3: Pre-authenticate Locally
 
 Best for: When you already have a token.json file
 
@@ -175,16 +213,16 @@ helm install yt-playlist ./helm/yt-playlist \
   --set playlists.donePlaylistId=PLyyyy
 ```
 
-### Method 3: Use Existing Secret
+## Web UI Screenshots
 
-Best for: Reusing existing credentials
+The authentication web UI provides a clean, modern interface:
 
-```bash
-helm install yt-playlist ./helm/yt-playlist \
-  --set playlists.todoPlaylistId=PLxxxx \
-  --set playlists.donePlaylistId=PLyyyy \
-  --set existingTokenSecret=my-existing-secret
-```
+- **Landing Page**: Click "Authenticate with Google" button
+- **OAuth Flow**: Standard Google sign-in and permission grant
+- **Success Page**: Confirmation that token was saved to Kubernetes
+- **No Command Line**: Everything works through the browser
+
+See [auth-ui/README.md](../../auth-ui/README.md) for more details.
 
 ## Monitoring
 

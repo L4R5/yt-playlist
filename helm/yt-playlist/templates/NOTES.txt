@@ -20,7 +20,34 @@ Configuration:
   Download Mode: {{ .Values.download.mode }}
   Poll Interval: {{ .Values.download.pollInterval }}s
 
-{{- if .Values.auth.enabled }}
+{{- if .Values.auth.ui.enabled }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  WEB UI AUTHENTICATION (NO COMMAND LINE REQUIRED!)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The authentication web UI has been deployed!
+
+1. Access the web interface:
+{{- if .Values.auth.ui.ingress.enabled }}
+   Open: https://{{ (index .Values.auth.ui.ingress.hosts 0).host }}
+{{- else }}
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "yt-playlist.fullname" . }}-auth-ui 5000:5000
+   Open: http://localhost:5000
+{{- end }}
+
+2. Click "Authenticate with Google" in your browser
+
+3. Grant YouTube permissions when prompted
+
+4. Success! Token is automatically saved to Kubernetes
+
+5. After authentication, disable the auth UI:
+   helm upgrade {{ .Release.Name }} ./helm/yt-playlist \
+     --set auth.ui.enabled=false \
+     --reuse-values
+
+{{- else if .Values.auth.enabled }}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   INITIAL OAUTH2 AUTHENTICATION REQUIRED
@@ -60,11 +87,19 @@ An authentication job has been created. Follow these steps:
 
 You need to provide an OAuth2 token. Choose one method:
 
-METHOD 1: Run authentication job (recommended)
+METHOD 1: Use Web UI (easiest - no command line!)
+  helm upgrade {{ .Release.Name }} ./helm/yt-playlist \
+    --set auth.ui.enabled=true \
+    --reuse-values
+  
+  Then access at http://localhost:5000 after port-forward:
+  kubectl port-forward svc/{{ include "yt-playlist.fullname" . }}-auth-ui 5000:5000
+
+METHOD 2: Run authentication job (requires kubectl)
   helm upgrade {{ .Release.Name }} ./helm/yt-playlist --set auth.enabled=true --reuse-values
   (Then follow the instructions that will appear)
 
-METHOD 2: Authenticate locally and upload token
+METHOD 3: Authenticate locally and upload token
   1. Run locally: python manage_playlist.py
   2. Complete OAuth flow (creates token.json)
   3. Create secret:
@@ -73,7 +108,7 @@ METHOD 2: Authenticate locally and upload token
        --from-literal=CLIENT_SECRET_JSON='YOUR_CLIENT_SECRET_JSON' \
        --from-file=token.json=./token.json
 
-METHOD 3: Use existing secret
+METHOD 4: Use existing secret
   helm upgrade {{ .Release.Name }} ./helm/yt-playlist \
     --set existingTokenSecret=your-secret-name \
     --reuse-values

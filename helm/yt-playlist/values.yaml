@@ -124,3 +124,35 @@ auth:
   serviceType: ClusterIP
   # NodePort for OAuth callback (only used if serviceType is NodePort)
   nodePort: 30080
+  
+  # Web UI for OAuth authentication (recommended)
+  ui:
+    enabled: false
+    image:
+      repository: ghcr.io/l4r5/yt-playlist-auth-ui
+      tag: latest
+      pullPolicy: Always
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+    service:
+      type: ClusterIP  # Use LoadBalancer or NodePort for external access
+      nodePort: null  # Set if using NodePort
+    ingress:
+      enabled: false
+      className: ""
+      annotations: {}
+        # cert-manager.io/cluster-issuer: letsencrypt-prod
+      hosts:
+        - host: auth.yt-playlist.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+      tls: []
+      #  - secretName: yt-playlist-auth-tls
+      #    hosts:
+      #      - auth.yt-playlist.example.com
