@@ -1,0 +1,139 @@
+name: Cleanup Old Releases and Images
+
+on:
+  workflow_run:
+    workflows: ["Build and Push Docker Image", "Build and Push Auth UI Docker Image"]
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      keep_count:
+        description: 'Number of releases to keep'
+        required: false
+        default: '10'
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  KEEP_COUNT: ${{ github.event.inputs.keep_count || '10' }}
+
+jobs:
+  cleanup-releases:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+      - name: Cleanup old releases
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const keepCount = parseInt(process.env.KEEP_COUNT);
+            console.log(`Keeping the latest ${keepCount} releases`);
+            
+            // Get all releases, sorted by creation date (newest first)
+            const releases = await github.paginate(
+              github.rest.repos.listReleases,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100
+              }
+            );
+            
+            console.log(`Found ${releases.length} total releases`);
+            
+            // Delete old releases (beyond keepCount)
+            const releasesToDelete = releases.slice(keepCount);
+            console.log(`Deleting ${releasesToDelete.length} old releases`);
+            
+            for (const release of releasesToDelete) {
+              console.log(`Deleting release: ${release.name || release.tag_name} (ID: ${release.id})`);
+              try {
+                await github.rest.repos.deleteRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: release.id
+                });
+                
+                // Also delete the associated tag
+                try {
+                  await github.rest.git.deleteRef({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    ref: `tags/${release.tag_name}`
+                  });
+                  console.log(`Deleted tag: ${release.tag_name}`);
+                } catch (tagError) {
+                  console.log(`Could not delete tag ${release.tag_name}: ${tagError.message}`);
+                }
+              } catch (error) {
+                console.log(`Failed to delete release ${release.id}: ${error.message}`);
+              }
+            }
+
+  cleanup-container-images:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    strategy:
+      matrix:
+        image: ['yt-playlist', 'yt-playlist-auth-ui']
+    
+    steps:
+      - name: Cleanup old container images for ${{ matrix.image }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const keepCount = parseInt(process.env.KEEP_COUNT);
+            const imageName = '${{ matrix.image }}';
+            console.log(`Processing ${imageName}: keeping latest ${keepCount} versions`);
+            
+            try {
+              // Get all versions of the package
+              const versions = await github.paginate(
+                github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg,
+                {
+                  package_type: 'container',
+                  package_name: imageName,
+                  org: context.repo.owner,
+                  per_page: 100
+                }
+              );
+              
+              console.log(`Found ${versions.length} versions for ${imageName}`);
+              
+              // Sort by created_at (newest first)
+              versions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              
+              // Delete old versions (beyond keepCount)
+              const versionsToDelete = versions.slice(keepCount);
+              console.log(`Deleting ${versionsToDelete.length} old versions`);
+              
+              for (const version of versionsToDelete) {
+                const tags = version.metadata?.container?.tags || [];
+                const tagStr = tags.length > 0 ? tags.join(', ') : 'untagged';
+                console.log(`Deleting version ID ${version.id} (tags: ${tagStr}, created: ${version.created_at})`);
+                
+                try {
+                  await github.rest.packages.deletePackageVersionForOrg({
+                    package_type: 'container',
+                    package_name: imageName,
+                    org: context.repo.owner,
+                    package_version_id: version.id
+                  });
+                  console.log(`Successfully deleted version ${version.id}`);
+                } catch (error) {
+                  console.log(`Failed to delete version ${version.id}: ${error.message}`);
+                }
+              }
+            } catch (error) {
+              if (error.status === 404) {
+                console.log(`Package ${imageName} not found - may not exist yet`);
+              } else {
+                throw error;
+              }
+            }
