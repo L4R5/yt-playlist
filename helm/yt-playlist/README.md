@@ -15,10 +15,26 @@ Kubernetes Helm chart for deploying the YouTube Playlist Manager application.
 1. **Add playlist IDs and client secret:**
 
 ```bash
-helm install yt-playlist ./helm/yt-playlist \
+# Method 1: From Helm repository (once published)
+helm repo add yt-playlist https://l4r5.github.io/yt-playlist/
+helm repo update
+
+helm install yt-playlist yt-playlist/yt-playlist \
   --set playlists.todoPlaylistId=PLxxxx... \
   --set playlists.donePlaylistId=PLyyyy... \
   --set clientSecretJson='{"installed":{"client_id":"...","client_secret":"...","redirect_uris":["http://localhost"]}}'
+
+# Method 2: From OCI registry
+helm install yt-playlist oci://ghcr.io/l4r5/charts/yt-playlist \
+  --set playlists.todoPlaylistId=PLxxxx... \
+  --set playlists.donePlaylistId=PLyyyy... \
+  --set clientSecretJson='{"installed":{...}}'
+
+# Method 3: From source
+helm install yt-playlist ./helm/yt-playlist \
+  --set playlists.todoPlaylistId=PLxxxx... \
+  --set playlists.donePlaylistId=PLyyyy... \
+  --set clientSecretJson='{"installed":{...}}'
 ```
 
 2. **Run initial authentication:**

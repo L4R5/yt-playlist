@@ -182,6 +182,38 @@ docker pull ghcr.io/l4r5/yt-playlist:latest
 
 **Option B: Build Locally**
 
+```bash
+docker build -t yt-playlist .
+```
+
+### Kubernetes (Helm)
+
+The easiest way to deploy in Kubernetes:
+
+```bash
+# Add Helm repository
+helm repo add yt-playlist https://l4r5.github.io/yt-playlist/
+helm repo update
+
+# Install with web UI for authentication
+helm install yt-playlist yt-playlist/yt-playlist \
+  --set auth.ui.enabled=true \
+  --set playlists.todoPlaylistId=PLxxxx \
+  --set playlists.donePlaylistId=PLyyyy \
+  --set clientSecretJson='{"installed":{...}}'
+
+# Access auth UI
+kubectl port-forward svc/yt-playlist-auth-ui 5000:5000
+# Open http://localhost:5000 and authenticate
+
+# After authentication, disable UI and start main app
+helm upgrade yt-playlist yt-playlist/yt-playlist --set auth.ui.enabled=false --reuse-values
+```
+
+See [helm/yt-playlist/README.md](helm/yt-playlist/README.md) for comprehensive Kubernetes deployment documentation.
+
+### Docker Compose
+
 **Steps:**
 
 1. **Create data directory and copy credentials:**
