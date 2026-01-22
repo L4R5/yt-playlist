@@ -19,7 +19,7 @@ rules:
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["get", "create", "update", "patch"]
-  resourceNames: [{{ .Values.secretName | quote }}]
+  resourceNames: [{{ (.Values.existingSecret | default .Values.secretName) | quote }}]
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["create"]
@@ -72,14 +72,14 @@ spec:
           protocol: TCP
         env:
         - name: SECRET_NAME
-          value: {{ .Values.secretName }}
+          value: {{ .Values.existingSecret | default .Values.secretName }}
         - name: NAMESPACE
           value: {{ .Release.Namespace }}
         {{- if .Values.clientSecretJson }}
         - name: CLIENT_SECRET_JSON
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.secretName }}
+              name: {{ .Values.existingSecret | default .Values.secretName }}
               key: CLIENT_SECRET_JSON
         {{- end }}
         livenessProbe:

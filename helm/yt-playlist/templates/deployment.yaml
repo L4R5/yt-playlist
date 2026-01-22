@@ -56,11 +56,11 @@ spec:
             configMapKeyRef:
               name: {{ include "yt-playlist.fullname" . }}
               key: POLL_INTERVAL
-        {{- if .Values.clientSecretJson }}
+        {{- if or .Values.clientSecretJson .Values.existingSecret }}
         - name: CLIENT_SECRET_JSON
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.secretName }}
+              name: {{ .Values.existingSecret | default .Values.secretName }}
               key: CLIENT_SECRET_JSON
         {{- end }}
         - name: TOKEN_FILE
@@ -92,7 +92,7 @@ spec:
         {{- end }}
       - name: data
         secret:
-          secretName: {{ .Values.existingTokenSecret | default .Values.secretName }}
+          secretName: {{ .Values.existingSecret | default .Values.secretName }}
           optional: true
       {{- with .Values.nodeSelector }}
       nodeSelector:

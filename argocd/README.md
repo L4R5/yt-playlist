@@ -4,6 +4,24 @@ Deploy the YouTube Playlist Manager using ArgoCD for GitOps-style continuous del
 
 ## Quick Start
 
+### Prerequisites
+
+Create a Kubernetes secret with your OAuth2 credentials:
+
+```bash
+# Create the secret with your OAuth2 client credentials
+kubectl create secret generic yt-playlist-oauth-credentials \
+  --namespace=yt-playlist \
+  --from-literal=CLIENT_SECRET_JSON='{"installed":{"client_id":"...","client_secret":"...","redirect_uris":["http://localhost"]}}'
+
+# Or from a file
+kubectl create secret generic yt-playlist-oauth-credentials \
+  --namespace=yt-playlist \
+  --from-file=CLIENT_SECRET_JSON=./client_secret.json
+```
+
+### Deployment
+
 1. **Apply the Application manifest:**
 
 ```bash
@@ -15,7 +33,7 @@ kubectl apply -f argocd/application.yaml
 Edit the `application.yaml` file and set:
 - `playlists.todoPlaylistId`
 - `playlists.donePlaylistId`
-- `clientSecretJson` (OAuth2 credentials)
+- `existingSecret` (reference to the secret created above)
 
 3. **Initial OAuth Authentication:**
 
@@ -39,7 +57,46 @@ auth:
 
 ArgoCD will automatically sync and disable the auth UI.
 
-## Configuration
+## Secrets Management
+
+### Method 1: Using Existing Secret (Recommended)
+
+Create a Kubernetes secret before deploying:
+
+```bash
+kubectl create namespace yt-playlist
+
+# Base64 encode your OAuth2 credentials
+CLIENT_SECRET='{"installed":{"client_id":"...","client_secret":"...","redirect_uris":["http://localhost"]}}'
+
+kubectl create secret generic yt-playlist-oauth-credentials \
+  --namespace=yt-playlist \
+  --from-literal=CLIENT_SECRET_JSON="$CLIENT_SECRET"
+```
+
+Then reference it in your Application:
+
+```yaml
+helm:
+  values: |
+    existingSecret: yt-playlist-oauth-credentials
+    playlists:
+      todoPlaylistId: "PLxxxx..."
+      donePlaylistId: "PLyyyy..."
+```
+
+### Method 2: Inline Credentials (Not Recommended)
+
+Only use for testing. Credentials will be stored in Git/ArgoCD:
+
+```yaml
+helm:
+  values: |
+    clientSecretJson: '{"installed":{...}}'
+    playlists:
+      todoPlaylistId: "PLxxxx..."
+      donePlaylistId: "PLyyyy..."
+```
 
 ### Basic Example
 

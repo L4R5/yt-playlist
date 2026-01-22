@@ -21,14 +21,14 @@ spec:
           todoPlaylistId: "PLxxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # Required: Your TODO playlist ID
           donePlaylistId: "PLyyyyyyyyyyyyyyyyyyyyyyyyyyyy"  # Required: Your DONE playlist ID
         
-        # OAuth2 Credentials - Method 1: JSON string (recommended)
-        clientSecretJson: '{"installed":{"client_id":"...","client_secret":"...","redirect_uris":["http://localhost"]}}'
+        # OAuth2 Credentials - Method 1: Use existing Kubernetes secret (recommended)
+        existingSecret: yt-playlist-oauth-credentials
+        # The secret must contain:
+        #   CLIENT_SECRET_JSON: base64 encoded OAuth2 client credentials JSON
+        #   token.json: (optional) base64 encoded OAuth2 token after authentication
         
-        # OAuth2 Credentials - Method 2: File-based (alternative)
-        # clientSecret:
-        #   enabled: true
-        #   data: |
-        #     {"installed":{"client_id":"...","client_secret":"...","redirect_uris":["http://localhost"]}}
+        # OAuth2 Credentials - Method 2: Inline JSON string (not recommended for production)
+        # clientSecretJson: '{"installed":{"client_id":"...","client_secret":"...","redirect_uris":["http://localhost"]}}'
         
         # Download Configuration
         downloadMode: video  # Options: video, audio

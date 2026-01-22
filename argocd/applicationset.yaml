@@ -53,10 +53,8 @@ spec:
               todoPlaylistId: "{{todoPlaylist}}"
               donePlaylistId: "{{donePlaylist}}"
             
-            # Use environment-specific secrets
-            clientSecret:
-              enabled: true
-              existingSecret: "yt-playlist-client-secret-{{env}}"
+            # Use environment-specific secret
+            existingSecret: "yt-playlist-oauth-{{env}}"
             
             downloadMode: video
             pollInterval: {{pollInterval}}

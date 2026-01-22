@@ -56,10 +56,13 @@ resources:
 # Option 1: Provide client secret JSON directly (for initial setup)
 # clientSecretJson: '{"installed":{"client_id":"...","client_secret":"...","redirect_uris":["http://localhost"]}}'
 
-# Option 2: Reference existing secret containing token.json (after initial auth)
-# existingTokenSecret: yt-playlist-token
+# Option 2: Reference existing secret containing client_secret.json and/or token.json
+# existingSecret: yt-playlist-oauth-credentials
+# When using existingSecret, the secret must contain:
+#   - CLIENT_SECRET_JSON: base64 encoded OAuth2 client credentials JSON
+#   - token.json: (optional) base64 encoded OAuth2 token after authentication
 
-# OAuth2 credentials secret name (auto-generated if not using existingTokenSecret)
+# OAuth2 credentials secret name (auto-generated if not using existingSecret)
 secretName: yt-playlist-credentials
 
 # YouTube playlist configuration (REQUIRED)

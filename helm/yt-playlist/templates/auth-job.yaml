@@ -68,7 +68,7 @@ spec:
         - name: CLIENT_SECRET_JSON
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.secretName }}
+              name: {{ .Values.existingSecret | default .Values.secretName }}
               key: CLIENT_SECRET_JSON
         {{- end }}
         - name: TOKEN_FILE
