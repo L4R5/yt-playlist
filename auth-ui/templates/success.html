@@ -163,19 +163,15 @@
         
         <h1>Authentication Successful!</h1>
         <p class="message">
-            Your YouTube credentials have been authenticated and securely saved to Kubernetes.
+            Your YouTube credentials have been authenticated and securely saved to persistent storage.
             The playlist manager can now start downloading videos.
         </p>
         
         <div class="details">
             <h3>Saved Credentials</h3>
             <div class="detail-row">
-                <span class="detail-label">Secret Name:</span>
-                <span class="detail-value">{{ secret_name }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Namespace:</span>
-                <span class="detail-value">{{ namespace }}</span>
+                <span class="detail-label">Token File:</span>
+                <span class="detail-value">{{ token_file }}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Status:</span>

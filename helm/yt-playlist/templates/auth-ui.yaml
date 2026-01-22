@@ -1,45 +1,5 @@
 {{- if .Values.auth.ui.enabled }}
 ---
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: {{ include "yt-playlist.fullname" . }}-auth-ui
-  labels:
-    {{- include "yt-playlist.labels" . | nindent 4 }}
-    app.kubernetes.io/component: auth-ui
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ include "yt-playlist.fullname" . }}-auth-ui
-  labels:
-    {{- include "yt-playlist.labels" . | nindent 4 }}
-    app.kubernetes.io/component: auth-ui
-rules:
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["get", "create", "update", "patch"]
-  resourceNames: [{{ (.Values.existingSecret | default .Values.secretName) | quote }}]
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["create"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ include "yt-playlist.fullname" . }}-auth-ui
-  labels:
-    {{- include "yt-playlist.labels" . | nindent 4 }}
-    app.kubernetes.io/component: auth-ui
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ include "yt-playlist.fullname" . }}-auth-ui
-subjects:
-- kind: ServiceAccount
-  name: {{ include "yt-playlist.fullname" . }}-auth-ui
-  namespace: {{ .Release.Namespace }}
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -59,7 +19,6 @@ spec:
         {{- include "yt-playlist.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: auth-ui
     spec:
-      serviceAccountName: {{ include "yt-playlist.fullname" . }}-auth-ui
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -71,10 +30,6 @@ spec:
           containerPort: 5000
           protocol: TCP
         env:
-        - name: SECRET_NAME
-          value: {{ .Values.existingSecret | default .Values.secretName }}
-        - name: NAMESPACE
-          value: {{ .Release.Namespace }}
         {{- if .Values.auth.ui.redirectUri }}
         - name: REDIRECT_URI
           value: {{ .Values.auth.ui.redirectUri }}
@@ -98,10 +53,21 @@ spec:
             port: http
           initialDelaySeconds: 5
           periodSeconds: 10
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
         resources:
           {{- toYaml .Values.auth.ui.resources | nindent 10 }}
         securityContext:
           {{- toYaml .Values.securityContext | nindent 10 }}
+      volumes:
+      - name: data
+        {{- if .Values.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ include "yt-playlist.fullname" . }}-data
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
