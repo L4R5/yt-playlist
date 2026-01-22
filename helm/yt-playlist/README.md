@@ -97,6 +97,9 @@ helm upgrade yt-playlist ./helm/yt-playlist --set auth.enabled=false --reuse-val
 | `persistence.retain` | Keep PVC after uninstall | `false` |
 | `resources.limits.cpu` | CPU limit | `1000m` |
 | `resources.limits.memory` | Memory limit | `1Gi` |
+| `securityContext.runAsUser` | User ID to run container as | `1000` |
+| `securityContext.runAsGroup` | Group ID to run container as | `1000` |
+| `podSecurityContext.fsGroup` | Group ID for volume ownership | `1000` |
 | `auth.enabled` | Enable authentication job | `false` |
 | `service.enabled` | Enable Service resource | `false` |
 | `serviceMonitor.enabled` | Enable Prometheus ServiceMonitor | `false` |
@@ -438,6 +441,30 @@ helm install yt-playlist ./helm/yt-playlist \
   --set persistence.storageClass=fast-ssd \
   --set persistence.size=200Gi
 ```
+
+### Custom User/Group IDs
+
+The container runs as UID 1000 by default. To use different IDs:
+
+```bash
+# Method 1: Using fsGroup (recommended for Kubernetes)
+# Kubernetes automatically changes volume ownership to fsGroup
+helm install yt-playlist ./helm/yt-playlist \
+  --set securityContext.runAsUser=5000 \
+  --set securityContext.runAsGroup=5000 \
+  --set podSecurityContext.fsGroup=5000
+
+# Method 2: Pre-create PVC with correct ownership
+kubectl exec -it <pod> -- chown -R 5000:5000 /app/downloads /app/data
+```
+
+**How it works:**
+- **Image default**: Container built with UID/GID 1000
+- **Kubernetes fsGroup**: Automatically changes mounted volume ownership
+- **Application files**: Readable by any user (application code in `/app`)
+- **Volume mounts**: `/app/downloads` and `/app/data` inherit fsGroup permissions
+
+**Note**: When changing UIDs, ensure fsGroup matches to allow volume access.
 
 ### Monitoring with Prometheus
 

@@ -20,8 +20,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY manage_playlist.py .
 COPY .env.example .
 
-# Create directories for data persistence
-RUN mkdir -p /app/downloads /app/data
+# Create non-root user and directories
+# Note: When using volumes in Kubernetes, fsGroup will override ownership
+RUN addgroup -g 1000 appgroup && \
+    adduser -D -u 1000 -G appgroup appuser && \
+    mkdir -p /app/downloads /app/data && \
+    chown -R appuser:appgroup /app
+
+# Switch to non-root user
+USER appuser:appgroup
 
 # Environment variables with defaults
 ENV CREDENTIALS_FILE=/app/data/client_secret.json \
