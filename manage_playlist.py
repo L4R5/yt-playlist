@@ -611,6 +611,28 @@ def main():
     
     args = parser.parse_args()
     
+    # Dump configuration for debugging
+    logger.info("=" * 60)
+    logger.info("CONFIGURATION DUMP")
+    logger.info("=" * 60)
+    logger.info(f"Mode: {'Daemon' if args.daemon else 'Single run'}")
+    logger.info(f"Download path: {args.download_path}")
+    logger.info(f"Poll interval: {args.poll_interval}s")
+    logger.info(f"Metrics port: {args.metrics_port}")
+    logger.info(f"Download mode: {DOWNLOAD_MODE}")
+    logger.info(f"Log level: {LOG_LEVEL}")
+    logger.info(f"Log file: {LOG_FILE}")
+    logger.info(f"Daily quota limit: {DAILY_QUOTA_LIMIT}")
+    logger.info(f"TODO playlist: {TODO_PLAYLIST_ID}")
+    logger.info(f"DONE playlist: {DONE_PLAYLIST_ID}")
+    logger.info(f"Token file: {TOKEN_FILE}")
+    if CLIENT_SECRET_JSON:
+        logger.info(f"Credentials: CLIENT_SECRET_JSON environment variable (length: {len(CLIENT_SECRET_JSON)} chars)")
+    else:
+        logger.info(f"Credentials file: {CREDENTIALS_FILE}")
+    logger.info(f"Token file exists: {os.path.exists(TOKEN_FILE)}")
+    logger.info("=" * 60)
+    
     # Start Prometheus metrics server
     try:
         start_http_server(args.metrics_port)
