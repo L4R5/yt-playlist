@@ -4,6 +4,10 @@
 
 YouTube occasionally requires authentication to confirm you're not a bot, especially when downloading many videos. The application uses your browser cookies to authenticate as if you're logged in.
 
+## Important Note About Cookie Format
+
+⚠️ **The application automatically normalizes cookie format**, so you can copy cookies with spaces or tabs - both will work. The Netscape cookies.txt format requires tab-separated fields, but the app converts spaces to tabs automatically.
+
 ## How to Export YouTube Cookies
 
 ### Method 1: Using Browser Extension (Recommended)

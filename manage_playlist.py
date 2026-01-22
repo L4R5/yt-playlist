@@ -357,11 +357,33 @@ class PlaylistManager:
         if COOKIES_CONTENT:
             # Write cookies content to temp file
             import tempfile
+            import re
+            
+            # Normalize cookie format: convert multiple spaces to single tab
+            # Netscape cookies format requires tabs, not spaces
+            normalized_cookies = re.sub(r'\s+', '\t', COOKIES_CONTENT.strip())
+            # But preserve spaces within cookie values (last field)
+            # Split each line and rejoin with tabs for first 6 fields, keep rest as-is
+            lines = []
+            for line in COOKIES_CONTENT.strip().split('\n'):
+                if line.startswith('#') or not line.strip():
+                    lines.append(line)  # Keep comments and empty lines as-is
+                else:
+                    # Split on whitespace, but only first 6 fields should be tab-separated
+                    parts = line.split(None, 6)  # Split max 7 fields
+                    if len(parts) == 7:
+                        # Rejoin with tabs: domain, flag, path, secure, expiration, name, value
+                        lines.append('\t'.join(parts))
+                    else:
+                        lines.append(line)  # Keep malformed lines as-is for debugging
+            
+            normalized_cookies = '\n'.join(lines)
+            
             cookies_temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
-            cookies_temp_file.write(COOKIES_CONTENT)
+            cookies_temp_file.write(normalized_cookies)
             cookies_temp_file.close()
             ydl_opts['cookiefile'] = cookies_temp_file.name
-            logger.debug(f"Using cookies from COOKIES_CONTENT environment variable")
+            logger.debug(f"Using cookies from COOKIES_CONTENT environment variable (normalized {len(lines)} lines)")
         elif COOKIES_FILE and os.path.exists(COOKIES_FILE):
             ydl_opts['cookiefile'] = COOKIES_FILE
             logger.debug(f"Using cookies from file: {COOKIES_FILE}")
