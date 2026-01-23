@@ -62,6 +62,13 @@ spec:
             
             replicaCount: {{replicaCount}}
             
+            # Tailscale VPN (optional - enables routing through home network)
+            tailscale:
+              enabled: false  # Set to true to enable
+              existingSecret: "tailscale-auth-{{env}}"
+              exitNode: "home-server"
+              acceptRoutes: true
+            
             persistence:
               enabled: true
               size: 10Gi

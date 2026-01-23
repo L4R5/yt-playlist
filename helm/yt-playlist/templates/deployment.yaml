@@ -25,6 +25,10 @@ spec:
       {{- if .Values.serviceAccount.create }}
       serviceAccountName: {{ include "yt-playlist.serviceAccountName" . }}
       {{- end }}
+      {{- if .Values.tailscale.enabled }}
+      # Share process namespace to allow inter-container process visibility
+      shareProcessNamespace: true
+      {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -115,6 +119,46 @@ spec:
           readOnly: true
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
+      {{- if .Values.tailscale.enabled }}
+      # Tailscale sidecar for VPN connectivity (routes traffic through home network)
+      - name: tailscale
+        image: "{{ .Values.tailscale.image.repository }}:{{ .Values.tailscale.image.tag }}"
+        imagePullPolicy: {{ .Values.tailscale.image.pullPolicy }}
+        env:
+        - name: TS_AUTHKEY
+          {{- if .Values.tailscale.existingSecret }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.tailscale.existingSecret }}
+              key: TS_AUTHKEY
+          {{- else }}
+          value: {{ .Values.tailscale.authKey | quote }}
+          {{- end }}
+        - name: TS_STATE_DIR
+          value: /var/lib/tailscale
+        - name: TS_SOCKET
+          value: /var/run/tailscale/tailscaled.sock
+        - name: TS_USERSPACE
+          value: "true"
+        {{- if .Values.tailscale.exitNode }}
+        - name: TS_EXTRA_ARGS
+          value: "--exit-node={{ .Values.tailscale.exitNode }} {{ if .Values.tailscale.acceptRoutes }}--accept-routes{{ end }} {{ join \" \" .Values.tailscale.extraArgs }}"
+        {{- else if or .Values.tailscale.acceptRoutes .Values.tailscale.extraArgs }}
+        - name: TS_EXTRA_ARGS
+          value: "{{ if .Values.tailscale.acceptRoutes }}--accept-routes{{ end }} {{ join \" \" .Values.tailscale.extraArgs }}"
+        {{- end }}
+        securityContext:
+          capabilities:
+            add:
+            - NET_ADMIN  # Required for network configuration
+        volumeMounts:
+        - name: tailscale-state
+          mountPath: /var/lib/tailscale
+        - name: tailscale-run
+          mountPath: /var/run/tailscale
+        resources:
+          {{- toYaml .Values.tailscale.resources | nindent 10 }}
+      {{- end }}
       volumes:
       - name: downloads
         {{- if .Values.persistence.enabled }}
@@ -134,6 +178,12 @@ spec:
         secret:
           secretName: {{ .Values.existingSecret | default .Values.secretName }}
           optional: true
+      {{- if .Values.tailscale.enabled }}
+      - name: tailscale-state
+        emptyDir: {}
+      - name: tailscale-run
+        emptyDir: {}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -40,6 +40,25 @@ spec:
           level: INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
           file: /tmp/playlist_manager.log
         
+        # Tailscale VPN (routes traffic through home network to bypass datacenter IP restrictions)
+        tailscale:
+          enabled: false  # Enable to route YouTube traffic through home IP
+          existingSecret: tailscale-auth  # Kubernetes secret containing TS_AUTHKEY
+          # authKey: "tskey-auth-xxxxxxxxxxxxx"  # Alternative: direct auth key (not recommended)
+          exitNode: "home-server"  # Tailscale hostname of home exit node
+          acceptRoutes: true
+          extraArgs: []
+          # extraArgs:
+          #   - "--advertise-tags=tag:k8s"
+          #   - "--hostname=yt-playlist-pod"
+          resources:
+            requests:
+              memory: "50Mi"
+              cpu: "50m"
+            limits:
+              memory: "200Mi"
+              cpu: "200m"
+        
         # Storage
         persistence:
           enabled: true
