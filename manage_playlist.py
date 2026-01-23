@@ -348,11 +348,6 @@ class PlaylistManager:
             'no_warnings': False,
             'ignoreerrors': False,
             'nocheckcertificate': True,
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'web'],  # Use multiple clients for better compatibility
-                }
-            },
             'retries': 10,
             'fragment_retries': 10,
             'verbose': True,  # Enable verbose output for debugging
