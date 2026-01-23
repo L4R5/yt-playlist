@@ -12,7 +12,7 @@ spec:
   source:
     repoURL: https://l4r5.github.io/yt-playlist/
     chart: yt-playlist
-    targetRevision: 1.0.6  # Chart version (update as needed)
+    targetRevision: 1.0.36  # Chart version (update as needed)
     helm:
       releaseName: yt-playlist
       values: |
@@ -47,6 +47,13 @@ spec:
           # authKey: "tskey-auth-xxxxxxxxxxxxx"  # Alternative: direct auth key (not recommended)
           exitNode: "home-server"  # Tailscale hostname of home exit node
           acceptRoutes: true
+          # tailscaledExtraArgs: "--verbose=1"  # Optional: extra args for tailscaled daemon
+          # HTTP proxy configuration (if Tailscale needs proxy to reach control server)
+          proxy:
+            enabled: false
+            httpProxy: ""   # e.g., "http://proxy.example.com:8080"
+            httpsProxy: ""  # e.g., "http://proxy.example.com:8080"
+            noProxy: ""     # e.g., "localhost,127.0.0.1,.svc,.cluster.local"
           extraArgs: []
           # extraArgs:
           #   - "--advertise-tags=tag:k8s"
