@@ -1,0 +1,102 @@
+suite: test pvc
+templates:
+  - pvc.yaml
+tests:
+  - it: should create two PVCs when enabled
+    set:
+      persistence.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: PersistentVolumeClaim
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-yt-playlist-downloads
+        documentIndex: 0
+      - equal:
+          path: spec.resources.requests.storage
+          value: 50Gi
+        documentIndex: 0
+      - isKind:
+          of: PersistentVolumeClaim
+        documentIndex: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-yt-playlist-data
+        documentIndex: 1
+      - equal:
+          path: spec.resources.requests.storage
+          value: 100Mi
+        documentIndex: 1
+
+  - it: should not create PVC when disabled
+    set:
+      persistence.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should add retention annotation when retain is true
+    set:
+      persistence.enabled: true
+      persistence.retain: true
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/resource-policy"]
+          value: keep
+        documentIndex: 0
+      - equal:
+          path: metadata.annotations["helm.sh/resource-policy"]
+          value: keep
+        documentIndex: 1
+
+  - it: should not add retention annotation when retain is false
+    set:
+      persistence.enabled: true
+      persistence.retain: false
+    asserts:
+      - isNull:
+          path: metadata.annotations["helm.sh/resource-policy"]
+        documentIndex: 0
+
+  - it: should use custom storage size for downloads PVC
+    set:
+      persistence.enabled: true
+      persistence.size: 500Gi
+    asserts:
+      - equal:
+          path: spec.resources.requests.storage
+          value: 500Gi
+        documentIndex: 0
+      - equal:
+          path: spec.resources.requests.storage
+          value: 100Mi
+        documentIndex: 1
+
+  - it: should use custom storage class
+    set:
+      persistence.enabled: true
+      persistence.storageClass: "fast-ssd"
+    asserts:
+      - equal:
+          path: spec.storageClassName
+          value: "fast-ssd"
+        documentIndex: 0
+      - equal:
+          path: spec.storageClassName
+          value: "fast-ssd"
+        documentIndex: 1
+
+  - it: should only create data PVC when using existingClaim for downloads
+    set:
+      persistence.enabled: true
+      persistence.existingClaim: "my-existing-pvc"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-yt-playlist-data
+        documentIndex: 0

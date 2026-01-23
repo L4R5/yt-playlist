@@ -1,0 +1,160 @@
+suite: test deployment
+templates:
+  - deployment.yaml
+  - configmap.yaml
+  - secret.yaml
+tests:
+  - it: should create deployment with default values
+    template: deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-yt-playlist
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: yt-playlist
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/l4r5/yt-playlist:1.0.31
+
+  - it: should use custom image tag when specified
+    set:
+      image.tag: "custom-tag"
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/l4r5/yt-playlist:custom-tag
+
+  - it: should configure environment variables correctly
+    set:
+      playlists.todoPlaylistId: "PLtest123"
+      playlists.donePlaylistId: "PLtest456"
+      download.mode: "audio"
+      download.pollInterval: 600
+      logging.level: "DEBUG"
+    template: deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TODO_PLAYLIST_ID
+            valueFrom:
+              configMapKeyRef:
+                key: TODO_PLAYLIST_ID
+                name: RELEASE-NAME-yt-playlist
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DOWNLOAD_MODE
+            valueFrom:
+              configMapKeyRef:
+                key: DOWNLOAD_MODE
+                name: RELEASE-NAME-yt-playlist
+
+  - it: should mount cookies when cookiesContent is provided
+    set:
+      download.cookiesContent: "# Netscape HTTP Cookie File"
+    template: deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COOKIES_CONTENT
+            valueFrom:
+              configMapKeyRef:
+                key: COOKIES_CONTENT
+                name: RELEASE-NAME-yt-playlist
+
+  - it: should mount cookies when cookiesFile is provided
+    set:
+      download.cookiesFile: "/app/cookies/cookies.txt"
+    template: deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COOKIES_FILE
+            valueFrom:
+              configMapKeyRef:
+                key: COOKIES_FILE
+                name: RELEASE-NAME-yt-playlist
+
+  - it: should enable Tailscale sidecar when enabled
+    set:
+      tailscale.enabled: true
+      tailscale.authKey: "tskey-auth-test"
+      tailscale.exitNode: "home-server"
+      tailscale.acceptRoutes: true
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: tailscale
+      - equal:
+          path: spec.template.spec.containers[1].image
+          value: tailscale/tailscale:latest
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: TS_AUTHKEY
+            value: "tskey-auth-test"
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: TS_EXTRA_ARGS
+            value: "--exit-node=home-server --accept-routes "
+
+  - it: should not create Tailscale sidecar when disabled
+    set:
+      tailscale.enabled: false
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: yt-playlist
+      - isNull:
+          path: spec.template.spec.containers[1]
+
+  - it: should configure resources correctly
+    set:
+      resources.requests.cpu: "500m"
+      resources.requests.memory: "512Mi"
+      resources.limits.cpu: "2000m"
+      resources.limits.memory: "2Gi"
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: "500m"
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: "512Mi"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+          value: "2000m"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: "2Gi"
+
+  - it: should add Tailscale extraArgs correctly
+    set:
+      tailscale.enabled: true
+      tailscale.authKey: "tskey-auth-test"
+      tailscale.exitNode: "home-server"
+      tailscale.acceptRoutes: true
+      tailscale.extraArgs:
+        - "--advertise-tags=tag:k8s"
+        - "--hostname=yt-playlist-pod"
+    template: deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: TS_EXTRA_ARGS
+            value: "--exit-node=home-server --accept-routes --advertise-tags=tag:k8s --hostname=yt-playlist-pod"

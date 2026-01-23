@@ -1,0 +1,74 @@
+suite: test ingress
+templates:
+  - ingress.yaml
+tests:
+  - it: should create Ingress when enabled
+    set:
+      ingress.enabled: true
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-yt-playlist
+
+  - it: should not create Ingress when disabled
+    set:
+      ingress.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should configure hosts correctly
+    set:
+      ingress.enabled: true
+      ingress.hosts:
+        - host: test.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: test.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /
+
+  - it: should configure TLS correctly
+    set:
+      ingress.enabled: true
+      ingress.tls:
+        - secretName: test-tls
+          hosts:
+            - test.example.com
+    asserts:
+      - equal:
+          path: spec.tls[0].secretName
+          value: test-tls
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: test.example.com
+
+  - it: should add custom annotations
+    set:
+      ingress.enabled: true
+      ingress.annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    asserts:
+      - equal:
+          path: metadata.annotations["cert-manager.io/cluster-issuer"]
+          value: letsencrypt-prod
+      - equal:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/ssl-redirect"]
+          value: "true"
+
+  - it: should set ingressClassName when specified
+    set:
+      ingress.enabled: true
+      ingress.className: nginx
+    asserts:
+      - equal:
+          path: spec.ingressClassName
+          value: nginx

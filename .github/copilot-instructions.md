@@ -1,12 +1,12 @@
 # YouTube Playlist Manager - AI Coding Instructions
 
 ## Project Overview
-Single-file Python application that monitors a YouTube "todo" playlist, downloads videos using yt-dlp, and moves completed videos to a "done" playlist. Designed to run as a daemon with Docker deployment support.
+Single-file Python application that monitors a YouTube "todo" playlist, downloads videos using yt-dlp, and moves completed videos to a "done" playlist. Designed to run as a daemon with Docker/Kubernetes deployment support.
 
 ## Architecture
 
 ### Single Module Design
-**manage_playlist.py** (443 lines) - Complete application in one file:
+**manage_playlist.py** (731 lines) - Complete application in one file:
 - `PlaylistManager` class encapsulates all YouTube API operations
 - OAuth2 authentication with automatic token refresh
 - Video processing pipeline: download → add to done → remove from todo
@@ -102,6 +102,10 @@ METRICS_PORT=8080                    # Prometheus metrics HTTP port
 DAILY_QUOTA_LIMIT=10000              # YouTube API daily quota limit
 LOG_LEVEL=INFO                       # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOG_FILE=/tmp/playlist_manager.log   # Log file path (writable location for containers)
+
+# YouTube cookies (bot detection bypass) - use ONE method:
+COOKIES_FILE=./cookies.txt           # Path to Netscape cookies.txt file
+COOKIES_CONTENT="..."                # Cookies content as string (for secrets)
 ```
 
 **Note**: `token.json` is auto-generated on first authentication and stored in the working directory. Advanced users can override with `TOKEN_FILE` environment variable if needed.
@@ -334,6 +338,7 @@ annotations:
    - Deployment with RBAC (ServiceAccount, Role, RoleBinding)
    - Automatically saves token to Kubernetes secret
    - Multi-arch images: ghcr.io/l4r5/yt-playlist-auth-ui
+   - Location: `auth-ui/` directory with Dockerfile and Flask app
 
 2. **Authentication Job**: One-time CLI authentication
    - Requires `kubectl port-forward` for OAuth callback
@@ -385,6 +390,53 @@ helm install my-release yt-playlist/yt-playlist
 - Suggestions in instructions.md are aspirational
 - Would require mocking `googleapiclient` and `yt_dlp` modules
 
+## YouTube Cookies for Bot Detection
+
+**Feature**: Bypass YouTube's bot detection by authenticating with browser cookies
+**Documentation**: See `COOKIES.md` for complete setup guide
+
+### Cookie Format Normalization
+- App automatically converts spaces to tabs (Netscape format requirement)
+- Both `COOKIES_FILE` (path) and `COOKIES_CONTENT` (string) supported
+- Implemented in lines 361-395 of `manage_playlist.py`
+- Creates temporary file from `COOKIES_CONTENT` at runtime
+
+### Export Methods
+1. Browser extensions (Get cookies.txt LOCALLY for Chrome, cookies.txt for Firefox)
+2. yt-dlp: `yt-dlp --cookies-from-browser chrome --cookies cookies.txt https://youtube.com/`
+
+### Kubernetes Integration
+```bash
+# Store cookies in secret
+kubectl create secret generic yt-playlist-cookies \
+  --from-literal=cookies="$(cat cookies.txt)"
+
+# Helm configuration
+helm upgrade yt-playlist yt-playlist/yt-playlist \
+  --set-string download.cookiesContent="$(cat cookies.txt)"
+```
+
+## Tailscale VPN Integration
+
+**Purpose**: Route traffic through home network to use residential IP instead of datacenter IP
+**Documentation**: See `TAILSCALE.md` for setup guide
+
+### Architecture
+- Sidecar container pattern in Kubernetes
+- Shares pod network namespace with main app
+- Requires exit node on home network
+- Auth key management via secrets
+
+### Configuration
+```yaml
+# helm/yt-playlist/values.yaml
+tailscale:
+  enabled: true
+  authKey: "tskey-auth-xxx"  # Or use existingSecret
+  exitNode: "home-server"    # Tailscale hostname
+  acceptRoutes: true
+```
+
 ## Common Debugging Commands
 ```bash
 # Docker
@@ -397,6 +449,13 @@ kubectl get pvc  # Check persistent volume claims
 kubectl describe pod <pod-name>
 helm status yt-playlist
 helm get values yt-playlist  # Show effective configuration
+
+# Cookies troubleshooting
+kubectl exec deployment/yt-playlist -- ls -la /app/cookies/
+kubectl exec deployment/yt-playlist -- env | grep COOKIES
+
+# Tailscale status (if enabled)
+kubectl exec deployment/yt-playlist -c tailscale -- tailscale status
 
 # Manual authentication test
 python manage_playlist.py  # Should open browser

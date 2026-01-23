@@ -1,0 +1,63 @@
+suite: test servicemonitor
+templates:
+  - servicemonitor.yaml
+tests:
+  - it: should create ServiceMonitor when enabled
+    set:
+      serviceMonitor.enabled: true
+    asserts:
+      - isKind:
+          of: ServiceMonitor
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-yt-playlist
+      - equal:
+          path: spec.endpoints[0].port
+          value: metrics
+      - equal:
+          path: spec.endpoints[0].interval
+          value: 30s
+      - equal:
+          path: spec.endpoints[0].scrapeTimeout
+          value: 10s
+      - equal:
+          path: spec.endpoints[0].path
+          value: /metrics
+
+  - it: should not create ServiceMonitor when disabled
+    set:
+      serviceMonitor.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should add custom labels
+    set:
+      serviceMonitor.enabled: true
+      serviceMonitor.additionalLabels:
+        prometheus: kube-prometheus
+        team: platform
+    asserts:
+      - equal:
+          path: metadata.labels.prometheus
+          value: kube-prometheus
+      - equal:
+          path: metadata.labels.team
+          value: platform
+
+  - it: should configure custom scrape settings
+    set:
+      serviceMonitor.enabled: true
+      serviceMonitor.interval: 60s
+      serviceMonitor.scrapeTimeout: 30s
+      serviceMonitor.path: /custom-metrics
+    asserts:
+      - equal:
+          path: spec.endpoints[0].interval
+          value: 60s
+      - equal:
+          path: spec.endpoints[0].scrapeTimeout
+          value: 30s
+      - equal:
+          path: spec.endpoints[0].path
+          value: /custom-metrics

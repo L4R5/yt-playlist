@@ -1,0 +1,56 @@
+suite: test auth-ui
+templates:
+  - auth-ui.yaml
+tests:
+  - it: should create auth UI resources when enabled
+    set:
+      auth.ui.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2  # Deployment and Service (RBAC in separate template)
+
+  - it: should not create auth UI resources when disabled
+    set:
+      auth.ui.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should configure auth UI deployment correctly
+    set:
+      auth.ui.enabled: true
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-yt-playlist-auth-ui
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/l4r5/yt-playlist-auth-ui:1.0.31
+
+  - it: should create auth UI service
+    set:
+      auth.ui.enabled: true
+    documentIndex: 1
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-yt-playlist-auth-ui
+      - equal:
+          path: spec.ports[0].port
+          value: 5000
+
+  - it: should use custom auth UI image
+    set:
+      auth.ui.enabled: true
+      auth.ui.image.repository: custom/auth-ui
+      auth.ui.image.tag: v2.0.0
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: custom/auth-ui:v2.0.0
