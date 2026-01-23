@@ -125,6 +125,16 @@ spec:
         image: "{{ .Values.tailscale.image.repository }}:{{ .Values.tailscale.image.tag }}"
         imagePullPolicy: {{ .Values.tailscale.image.pullPolicy }}
         env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_UID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
+        - name: TS_KUBE_SECRET
+          value: "tailscale"
         - name: TS_AUTHKEY
           {{- if .Values.tailscale.existingSecret }}
           valueFrom:

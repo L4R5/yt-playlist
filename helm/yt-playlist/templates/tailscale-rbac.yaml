@@ -1,0 +1,37 @@
+{{- if .Values.tailscale.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "yt-playlist.fullname" . }}-tailscale
+  labels:
+    {{- include "yt-playlist.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tailscale
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "get", "update", "patch"]
+  resourceNames: ["tailscale"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "yt-playlist.fullname" . }}-tailscale
+  labels:
+    {{- include "yt-playlist.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tailscale
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "yt-playlist.fullname" . }}-tailscale
+subjects:
+- kind: ServiceAccount
+  name: {{ include "yt-playlist.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}
