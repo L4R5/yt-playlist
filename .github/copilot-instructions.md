@@ -1,8 +1,21 @@
 # YouTube Playlist Manager - AI Coding Instructions
 
 ## Project Overview
-Single-file Python application that monitors a YouTube "todo" playlist, downloads videos using yt-dlp, and moves completed videos to a "done" playlist. Designed to run as a daemon with Docker/Kubernetes deployment support.
+take a look to the the container cleanup workflowSingle-file Python application that monitors a YouTube "todo" playlist, downloads videos using yt-dlp, and moves completed videos to a "done" playlist. Designed to run as a daemon with Docker/Kubernetes deployment support.
+## Local Development
 
+### Running the Application Locally
+**Always use the virtual environment** when running the app locally:
+```bash
+cd /home/lamerke/git/yt-playlist
+source venv/bin/activate  # Always activate venv first
+python manage_playlist.py  # Run application
+```
+
+This ensures:
+- Correct Python dependencies are used
+- No conflicts with system packages
+- Consistent execution environment
 ## Architecture
 
 ### Single Module Design
