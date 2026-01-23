@@ -11,6 +11,7 @@ import time
 import json
 import logging
 import argparse
+import shutil
 from pathlib import Path
 from typing import List, Dict, Optional
 from threading import Thread
@@ -341,6 +342,13 @@ class PlaylistManager:
             format_string = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
             logger.info(f"Download mode: full video")
         
+        # Detect Node.js path for JavaScript runtime support
+        node_path = shutil.which('node')
+        if node_path:
+            logger.debug(f"Found Node.js at: {node_path}")
+        else:
+            logger.warning("Node.js not found in PATH - some videos may fail to download")
+        
         ydl_opts = {
             'format': format_string,
             'outtmpl': str(download_path / '%(title)s.%(ext)s'),
@@ -352,6 +360,10 @@ class PlaylistManager:
             'fragment_retries': 10,
             'verbose': True,  # Enable verbose output for debugging
         }
+        
+        # Configure Node.js runtime if available (for JavaScript extraction)
+        if node_path:
+            ydl_opts['js_runtimes'] = {'node': {'path': node_path}}
         
         # Add cookies if provided (helps bypass bot detection)
         cookies_temp_file = None
