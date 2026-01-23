@@ -198,8 +198,6 @@ jobs:
                     });
                     console.log(`✓ Deleted tagged version ${version.id} (user API)`);
                   } else {
-                    console.log(`✓ Deleted tagged version ${version.id} (user API)`);
-                  } else {
                     console.log(`✗ Failed to delete version ${version.id}: ${deleteError.message}`);
                   }
                 }
