@@ -6,7 +6,8 @@ RUN apk add --no-cache \
     gcc \
     musl-dev \
     linux-headers \
-    nodejs
+    nodejs \
+    curl
 
 # Set working directory
 WORKDIR /app
