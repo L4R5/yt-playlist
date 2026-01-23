@@ -98,6 +98,18 @@ spec:
           value: "/app/data/token.json"
         - name: DOWNLOAD_PATH
           value: "/app/downloads"
+        {{- if .Values.tailscale.enabled }}
+        {{- if .Values.tailscale.proxy.enabled }}
+        - name: HTTP_PROXY
+          value: {{ .Values.tailscale.proxy.httpProxy | quote }}
+        - name: HTTPS_PROXY
+          value: {{ .Values.tailscale.proxy.httpsProxy | quote }}
+        {{- if .Values.tailscale.proxy.noProxy }}
+        - name: NO_PROXY
+          value: {{ .Values.tailscale.proxy.noProxy | quote }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
         {{- if .Values.service.enabled }}
         ports:
         - name: metrics
@@ -150,6 +162,20 @@ spec:
           value: /var/run/tailscale/tailscaled.sock
         - name: TS_USERSPACE
           value: "true"
+        {{- if .Values.tailscale.tailscaledExtraArgs }}
+        - name: TS_TAILSCALED_EXTRA_ARGS
+          value: {{ .Values.tailscale.tailscaledExtraArgs | quote }}
+        {{- end }}
+        {{- if .Values.tailscale.proxy.enabled }}
+        - name: HTTP_PROXY
+          value: {{ .Values.tailscale.proxy.httpProxy | quote }}
+        - name: HTTPS_PROXY
+          value: {{ .Values.tailscale.proxy.httpsProxy | quote }}
+        {{- if .Values.tailscale.proxy.noProxy }}
+        - name: NO_PROXY
+          value: {{ .Values.tailscale.proxy.noProxy | quote }}
+        {{- end }}
+        {{- end }}
         {{- if .Values.tailscale.exitNode }}
         - name: TS_EXTRA_ARGS
           value: "--exit-node={{ .Values.tailscale.exitNode }} {{ if .Values.tailscale.acceptRoutes }}--accept-routes{{ end }} {{ join " " .Values.tailscale.extraArgs }}"

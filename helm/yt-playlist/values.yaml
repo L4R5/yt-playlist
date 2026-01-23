@@ -124,6 +124,15 @@ tailscale:
   # Additional Tailscale arguments
   extraArgs: []
   # Example: ["--advertise-tags=tag:k8s", "--hostname=yt-playlist-pod"]
+  # Additional tailscaled daemon arguments (passed to TS_TAILSCALED_EXTRA_ARGS)
+  tailscaledExtraArgs: ""
+  # Example: "--verbose=1" or "--debug=" for debugging
+  # HTTP proxy configuration (for Tailscale to reach control server through proxy)
+  proxy:
+    enabled: false
+    httpProxy: ""   # e.g., "http://proxy.example.com:8080"
+    httpsProxy: ""  # e.g., "http://proxy.example.com:8080"
+    noProxy: ""     # e.g., "localhost,127.0.0.1,.svc,.cluster.local"
   resources:
     requests:
       memory: "50Mi"
