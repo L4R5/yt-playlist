@@ -1,7 +1,8 @@
 # YouTube Playlist Manager - AI Coding Instructions
 
 ## Project Overview
-take a look to the the container cleanup workflowSingle-file Python application that monitors a YouTube "todo" playlist, downloads videos using yt-dlp, and moves completed videos to a "done" playlist. Designed to run as a daemon with Docker/Kubernetes deployment support.
+Single-file Python application that monitors a YouTube "todo" playlist, downloads videos using yt-dlp, and moves completed videos to a "done" playlist. Designed to run as a daemon with Docker/Kubernetes deployment support.
+
 ## Local Development
 
 ### Running the Application Locally
@@ -19,7 +20,7 @@ This ensures:
 ## Architecture
 
 ### Single Module Design
-**manage_playlist.py** (731 lines) - Complete application in one file:
+**manage_playlist.py** (737 lines) - Complete application in one file:
 - `PlaylistManager` class encapsulates all YouTube API operations
 - OAuth2 authentication with automatic token refresh
 - Video processing pipeline: download → add to done → remove from todo
@@ -291,12 +292,25 @@ GitHub Actions workflow (`.github/workflows/docker-build.yml`):
 - Builds for `linux/amd64` and `linux/arm64`
 - Pushes to `ghcr.io/l4r5/yt-playlist` on main branch
 - Tags: branch name, semver, SHA
+- Separate workflow for auth-ui: `.github/workflows/docker-build-auth-ui.yml`
 
 ### Alpine-based Image
 - Base: `python:3.13-alpine`
 - System deps: `ffmpeg`, `gcc`, `musl-dev`, `linux-headers` (for compilation)
 - Entrypoint: `python manage_playlist.py`
 - Default CMD: `--daemon`
+
+### Automated Cleanup
+`.github/workflows/cleanup-old-releases.yml` - Triggered after Docker builds:
+- **Purpose**: Prevent GHCR storage bloat from CI/CD builds
+- **Retention**: Keeps 10 latest versions (configurable via `keep_count`)
+- **Two-phase cleanup**:
+  1. Deletes ALL untagged images (orphaned layers from cancelled builds)
+  2. Deletes old tagged releases beyond retention limit
+- **Dual API support**: Handles both organization and user-owned packages
+- **Releases + Tags**: Cleans GitHub releases AND associated Git tags
+- **Matrix strategy**: Processes both `yt-playlist` and `yt-playlist-auth-ui` images
+- **Trigger**: Runs after docker-build workflows complete on main branch
 
 ## Kubernetes Deployment
 
@@ -387,6 +401,23 @@ helm repo add yt-playlist https://l4r5.github.io/yt-playlist/
 helm install my-release yt-playlist/yt-playlist
 ```
 
+### Helm Testing
+`.github/workflows/helm-test.yml` - Automated chart validation:
+- **helm-unittest**: Unit tests with snapshot comparisons (`helm/yt-playlist/tests/`)
+- **helm template**: Validates successful rendering without syntax errors
+- **helm lint**: Schema validation and best practices checks
+- Runs on PR and main branch changes to `helm/**` paths
+- Test coverage includes: deployment configs, secrets, PVC, ingress, service monitors, auth-ui
+
+**Running tests locally:**
+```bash
+helm plugin install https://github.com/helm-unittest/helm-unittest
+cd helm/yt-playlist
+helm unittest .  # Run all tests
+helm unittest -f 'tests/deployment_test.yaml' .  # Specific test
+helm unittest -v .  # Verbose output
+```
+
 ### ArgoCD GitOps Deployment
 **argocd/** directory contains:
 - **application.yaml**: Single-environment deployment
@@ -398,10 +429,31 @@ helm install my-release yt-playlist/yt-playlist
 2. Manual certificates via Kubernetes secret
 3. Wildcard certificates for multiple domains
 
-## Testing Status
-**No tests currently implemented** (mentioned in instructions but not present in codebase)
-- Suggestions in instructions.md are aspirational
+## Testing
+
+### Helm Chart Tests
+**Location**: `helm/yt-playlist/tests/` - Unit tests using helm-unittest plugin
+
+**Test coverage** (8 test files with snapshots):
+- `deployment_test.yaml`: Main app deployment, Tailscale sidecar, cookies, resource limits
+- `auth-ui_test.yaml`: Flask OAuth UI deployment, service, RBAC
+- `secret_test.yaml`: OAuth credential handling, existingSecret support
+- `pvc_test.yaml`: Persistent volume retention policy, subPath mounting
+- `service_test.yaml`: Metrics service configuration
+- `servicemonitor_test.yaml`: Prometheus Operator integration
+- `ingress_test.yaml`: TLS configuration, cert-manager annotations
+
+**Running tests:**
+```bash
+cd helm/yt-playlist
+helm unittest .  # Requires: helm plugin install https://github.com/helm-unittest/helm-unittest
+```
+
+### Python Application Tests
+**Status**: Not implemented
+- No pytest or unit test framework currently in codebase
 - Would require mocking `googleapiclient` and `yt_dlp` modules
+- `manage_playlist.py` has no test coverage
 
 ## YouTube Cookies for Bot Detection
 
