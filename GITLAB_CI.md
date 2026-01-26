@@ -62,18 +62,33 @@ The pipeline has 4 stages:
 - Automatic deployment from `helm-release` artifacts
 - Repository URL: `https://<namespace>.gitlab.io/<project>`
 
-### 4. Cleanup Stage
+## Container Registry Cleanup
 
-**Job: `cleanup-registry`**
-- Cleans up old container images from GitLab Container Registry
-- Keeps 10 latest tags per repository (configurable via `KEEP_COUNT`)
-- Processes both main app and auth-ui repositories
-- Uses GitLab API to list and delete old tags
-- **Manual trigger only** - prevents accidental deletions
+**Built-in Cleanup Policy (Recommended):**
 
-**Job: `trigger-cleanup`**
-- Placeholder job to remind about manual cleanup after builds
-- Runs after successful builds on main branch
+GitLab's automatic cleanup policy is configured via API using `scripts/configure-registry-cleanup.sh`:
+
+```bash
+# Run locally with authenticated glab
+./scripts/configure-registry-cleanup.sh
+
+# Verify configuration
+glab api /projects/l4r51%2Fyt-playlist | jq '.container_expiration_policy'
+```
+
+**Default settings:**
+- Enabled: true
+- Keep: 10 newest tags per repository
+- Delete: Tags older than 30 days
+- Runs: Daily at midnight UTC
+
+**Benefits:**
+- ✅ Automatic daily execution (no CI/CD minutes)
+- ✅ GitLab-managed, no custom scripts
+- ✅ Visible in UI: Settings → Packages & Registries → Cleanup policies
+- ✅ Consistent across all repositories
+
+See `scripts/README.md` for customization options.
 
 ## Required GitLab Settings
 
@@ -82,6 +97,11 @@ The pipeline has 4 stages:
 1. Enable Container Registry in your project:
    - Go to: Settings → General → Visibility
    - Enable "Container Registry"
+
+2. Configure cleanup policy (one-time setup):
+   ```bash
+   ./scripts/configure-registry-cleanup.sh
+   ```
 
 ### GitLab Pages
 
