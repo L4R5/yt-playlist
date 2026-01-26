@@ -172,8 +172,9 @@ helm-release:
 # GitLab Pages deployment (automatic from artifacts)
 pages:
   stage: release
-  dependencies:
-    - helm-release
+  needs:
+    - job: helm-release
+      artifacts: true
   script:
     - echo "Deploying Helm repository to GitLab Pages..."
     - ls -la public/

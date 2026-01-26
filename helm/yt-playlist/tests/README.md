@@ -35,6 +35,24 @@ Run with verbose output:
 helm unittest -v .
 ```
 
+## Test Design Principles
+
+**Version Independence**: Tests use regex patterns (`matchRegex`) instead of hard-coded versions to avoid brittle tests that break on every version bump. For example:
+
+```yaml
+# Good: Version-agnostic pattern matching
+- matchRegex:
+    path: spec.template.spec.containers[0].image
+    pattern: ^ghcr.io/l4r5/yt-playlist:.+$
+
+# Bad: Hard-coded version (requires manual updates)
+- equal:
+    path: spec.template.spec.containers[0].image
+    value: ghcr.io/l4r5/yt-playlist:1.0.37
+```
+
+This approach validates image structure and naming while allowing Chart.yaml's `appVersion` to be the single source of truth for versions.
+
 ## Test Coverage
 
 The test suite covers:

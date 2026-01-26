@@ -18,9 +18,9 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].name
           value: yt-playlist
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: ghcr.io/l4r5/yt-playlist:1.0.37
+          pattern: ^ghcr.io/l4r5/yt-playlist:.+$
 
   - it: should use custom image tag when specified
     set:
