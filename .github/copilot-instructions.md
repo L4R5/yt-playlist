@@ -287,12 +287,25 @@ Dictionary structure: `{'playlist_item_id': str, 'video_id': str, 'title': str, 
 
 ## Docker Build & CI/CD
 
+### CI/CD Platform Synchronization
+**CRITICAL**: This project supports both GitHub Actions and GitLab CI/CD with **identical trigger rules**.
+- **When modifying workflows**: Update BOTH `.github/workflows/` AND `.gitlab-ci.yml`
+- **Trigger consistency**: Main branch pushes, version tags (v*.*.*), manual runs only
+- **No PR/MR builds**: Conserves CI/CD minutes, prevents redundant builds
+
 ### Multi-platform Build
 GitHub Actions workflow (`.github/workflows/docker-build.yml`):
 - Builds for `linux/amd64` and `linux/arm64`
 - Pushes to `ghcr.io/l4r5/yt-playlist` on main branch
 - Tags: branch name, semver, SHA
 - Separate workflow for auth-ui: `.github/workflows/docker-build-auth-ui.yml`
+- **Triggers**: Main branch, version tags, manual (NO pull requests)
+
+GitLab CI/CD pipeline (`.gitlab-ci.yml`):
+- Same multi-platform build strategy
+- Pushes to `registry.gitlab.com/<namespace>/<project>`
+- **Triggers**: Main branch, version tags, manual (NO merge requests)
+- See `GITLAB_CI.md` for complete documentation
 
 ### Alpine-based Image
 - Base: `python:3.13-alpine`

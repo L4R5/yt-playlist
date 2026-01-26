@@ -4,16 +4,8 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'auth-ui/**'
-      - '.github/workflows/docker-build-auth-ui.yml'
     tags:
       - 'v*'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'auth-ui/**'
   workflow_dispatch:
 
 env:

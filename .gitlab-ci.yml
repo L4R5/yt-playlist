@@ -1,0 +1,266 @@
+stages:
+  - test
+  - build
+  - release
+  - cleanup
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  # Multi-platform build support
+  DOCKER_BUILDKIT: 1
+  BUILDX_PLATFORMS: "linux/amd64,linux/arm64"
+
+# Helm Chart Testing
+helm-test:
+  stage: test
+  image: alpine/helm:latest
+  before_script:
+    - helm plugin install https://github.com/helm-unittest/helm-unittest --version=v0.3.3
+  script:
+    - echo "Running Helm unit tests..."
+    - cd helm/yt-playlist
+    - helm unittest . --with-subchart=false
+    - echo "Validating Helm template rendering..."
+    - helm template . --name-template yt-playlist --namespace default --dry-run=client > /dev/null
+    - echo "✓ Helm template renders successfully"
+    - echo "Running Helm lint..."
+    - helm lint .
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - helm/**/*
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - helm/**/*
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+
+# Build main application Docker image
+build-yt-playlist:
+  stage: build
+  image: docker:24-dind
+  services:
+    - docker:24-dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker context create builder
+    - docker buildx create --use builder
+    - docker buildx inspect --bootstrap
+  script:
+    - |
+      # Determine tags based on ref
+      TAGS=""
+      if [ "$CI_COMMIT_BRANCH" == "main" ]; then
+        TAGS="--tag $CI_REGISTRY_IMAGE:latest"
+        TAGS="$TAGS --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+      elif [ "$CI_COMMIT_TAG" != "" ]; then
+        TAGS="--tag $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
+        # Extract version parts (e.g., v1.2.3 -> 1, 1.2, 1.2.3)
+        VERSION=${CI_COMMIT_TAG#v}
+        MAJOR=$(echo $VERSION | cut -d. -f1)
+        MINOR=$(echo $VERSION | cut -d. -f1-2)
+        TAGS="$TAGS --tag $CI_REGISTRY_IMAGE:$VERSION"
+        TAGS="$TAGS --tag $CI_REGISTRY_IMAGE:$MAJOR"
+        TAGS="$TAGS --tag $CI_REGISTRY_IMAGE:$MINOR"
+      else
+        TAGS="--tag $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG"
+      fi
+    - echo "Building with tags:$TAGS"
+    - |
+      docker buildx build \
+        --platform $BUILDX_PLATFORMS \
+        --push \
+        $TAGS \
+        --cache-from type=registry,ref=$CI_REGISTRY_IMAGE:buildcache \
+        --cache-to type=registry,ref=$CI_REGISTRY_IMAGE:buildcache,mode=max \
+        .
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+
+# Build auth-ui Docker image
+build-auth-ui:
+  stage: build
+  image: docker:24-dind
+  services:
+    - docker:24-dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker context create builder
+    - docker buildx create --use builder
+    - docker buildx inspect --bootstrap
+  script:
+    - |
+      # Registry image name for auth-ui
+      AUTH_UI_IMAGE="$CI_REGISTRY_IMAGE/auth-ui"
+      
+      # Determine tags based on ref
+      TAGS=""
+      if [ "$CI_COMMIT_BRANCH" == "main" ]; then
+        TAGS="--tag $AUTH_UI_IMAGE:latest"
+        TAGS="$TAGS --tag $AUTH_UI_IMAGE:$CI_COMMIT_SHORT_SHA"
+      elif [ "$CI_COMMIT_TAG" != "" ]; then
+        TAGS="--tag $AUTH_UI_IMAGE:$CI_COMMIT_TAG"
+        VERSION=${CI_COMMIT_TAG#v}
+        MAJOR=$(echo $VERSION | cut -d. -f1)
+        MINOR=$(echo $VERSION | cut -d. -f1-2)
+        TAGS="$TAGS --tag $AUTH_UI_IMAGE:$VERSION"
+        TAGS="$TAGS --tag $AUTH_UI_IMAGE:$MAJOR"
+        TAGS="$TAGS --tag $AUTH_UI_IMAGE:$MINOR"
+      else
+        TAGS="--tag $AUTH_UI_IMAGE:$CI_COMMIT_REF_SLUG"
+      fi
+    - echo "Building auth-ui with tags:$TAGS"
+    - |
+      docker buildx build \
+        --platform $BUILDX_PLATFORMS \
+        --push \
+        $TAGS \
+        --cache-from type=registry,ref=$AUTH_UI_IMAGE:buildcache \
+        --cache-to type=registry,ref=$AUTH_UI_IMAGE:buildcache,mode=max \
+        --file auth-ui/Dockerfile \
+        auth-ui/
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+
+# Helm chart release (GitLab Pages)
+helm-release:
+  stage: release
+  image: alpine/helm:latest
+  before_script:
+    - apk add --no-cache git curl
+    - git config user.name "${GITLAB_USER_NAME}"
+    - git config user.email "${GITLAB_USER_EMAIL}"
+  script:
+    - |
+      echo "Packaging Helm chart..."
+      cd helm
+      helm package yt-playlist
+      
+      # Get chart version
+      CHART_VERSION=$(grep '^version:' yt-playlist/Chart.yaml | awk '{print $2}')
+      APP_VERSION=$(grep '^appVersion:' yt-playlist/Chart.yaml | awk '{print $2}' | tr -d '"')
+      
+      echo "Chart version: $CHART_VERSION"
+      echo "App version: $APP_VERSION"
+      
+      # Create public directory for GitLab Pages
+      mkdir -p ../public
+      mv yt-playlist-${CHART_VERSION}.tgz ../public/
+      
+      # Generate or update index.yaml
+      cd ../public
+      if [ -f index.yaml ]; then
+        helm repo index . --merge index.yaml --url "https://${CI_PROJECT_NAMESPACE}.gitlab.io/${CI_PROJECT_NAME}"
+      else
+        helm repo index . --url "https://${CI_PROJECT_NAMESPACE}.gitlab.io/${CI_PROJECT_NAME}"
+      fi
+      
+      echo "Helm chart packaged and indexed successfully"
+      echo "Repository URL: https://${CI_PROJECT_NAMESPACE}.gitlab.io/${CI_PROJECT_NAME}"
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - helm/**/*
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+
+# GitLab Pages deployment (automatic from artifacts)
+pages:
+  stage: release
+  dependencies:
+    - helm-release
+  script:
+    - echo "Deploying Helm repository to GitLab Pages..."
+    - ls -la public/
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - helm/**/*
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+
+# Cleanup old container images
+cleanup-registry:
+  stage: cleanup
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      echo "Cleaning up old container images..."
+      KEEP_COUNT=10
+      PROJECT_ID=$CI_PROJECT_ID
+      
+      # Function to cleanup a repository
+      cleanup_repo() {
+        REPO_ID=$1
+        REPO_NAME=$2
+        
+        echo "Processing repository: $REPO_NAME (ID: $REPO_ID)"
+        
+        # Get all tags for this repository
+        TAGS=$(curl --header "PRIVATE-TOKEN: $CI_JOB_TOKEN" \
+          "https://gitlab.com/api/v4/projects/$PROJECT_ID/registry/repositories/$REPO_ID/tags?per_page=100" \
+          | jq -r '.[].name')
+        
+        TAG_COUNT=$(echo "$TAGS" | wc -l)
+        echo "Found $TAG_COUNT tags"
+        
+        if [ $TAG_COUNT -le $KEEP_COUNT ]; then
+          echo "Only $TAG_COUNT tags found, keeping all"
+          return
+        fi
+        
+        # Get tags sorted by creation date, skip the newest N
+        TAGS_TO_DELETE=$(curl --header "PRIVATE-TOKEN: $CI_JOB_TOKEN" \
+          "https://gitlab.com/api/v4/projects/$PROJECT_ID/registry/repositories/$REPO_ID/tags?per_page=100" \
+          | jq -r 'sort_by(.created_at) | reverse | .['"$KEEP_COUNT"':] | .[].name')
+        
+        # Delete old tags
+        for TAG in $TAGS_TO_DELETE; do
+          echo "Deleting tag: $TAG"
+          curl --request DELETE --header "PRIVATE-TOKEN: $CI_JOB_TOKEN" \
+            "https://gitlab.com/api/v4/projects/$PROJECT_ID/registry/repositories/$REPO_ID/tags/$TAG" \
+            || echo "Failed to delete $TAG"
+        done
+      }
+      
+      # Get all container repositories in this project
+      REPOS=$(curl --header "PRIVATE-TOKEN: $CI_JOB_TOKEN" \
+        "https://gitlab.com/api/v4/projects/$PROJECT_ID/registry/repositories" \
+        | jq -r '.[] | "\(.id)|\(.path)"')
+      
+      # Process each repository
+      echo "$REPOS" | while IFS='|' read -r REPO_ID REPO_PATH; do
+        if [ -n "$REPO_ID" ]; then
+          cleanup_repo "$REPO_ID" "$REPO_PATH"
+        fi
+      done
+      
+      echo "Cleanup complete"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+  allow_failure: true
+
+# Trigger cleanup after successful builds
+trigger-cleanup:
+  stage: cleanup
+  needs:
+    - build-yt-playlist
+    - build-auth-ui
+  script:
+    - echo "Build completed, cleanup can be triggered manually"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  allow_failure: true
