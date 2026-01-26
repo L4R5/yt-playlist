@@ -28,7 +28,7 @@ tests:
           value: RELEASE-NAME-yt-playlist-auth-ui
       - equal:
           path: spec.template.spec.containers[0].image
-          value: ghcr.io/l4r5/yt-playlist-auth-ui:1.0.32
+          value: ghcr.io/l4r5/yt-playlist-auth-ui:1.0.37
 
   - it: should create auth UI service
     set:

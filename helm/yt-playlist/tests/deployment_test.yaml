@@ -20,7 +20,7 @@ tests:
           value: yt-playlist
       - equal:
           path: spec.template.spec.containers[0].image
-          value: ghcr.io/l4r5/yt-playlist:1.0.32
+          value: ghcr.io/l4r5/yt-playlist:1.0.37
 
   - it: should use custom image tag when specified
     set:
