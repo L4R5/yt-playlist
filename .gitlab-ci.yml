@@ -14,8 +14,10 @@ variables:
 # Helm Chart Testing
 helm-test:
   stage: test
-  image: alpine/helm:latest
+  image: alpine:latest
   before_script:
+    - apk add --no-cache curl bash
+    - curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
     - helm plugin install https://github.com/helm-unittest/helm-unittest --version=v0.3.3
   script:
     - echo "Running Helm unit tests..."
@@ -129,9 +131,10 @@ build-auth-ui:
 # Helm chart release (GitLab Pages)
 helm-release:
   stage: release
-  image: alpine/helm:latest
+  image: alpine:latest
   before_script:
-    - apk add --no-cache git curl
+    - apk add --no-cache git curl bash
+    - curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
     - git config user.name "${GITLAB_USER_NAME}"
     - git config user.email "${GITLAB_USER_EMAIL}"
   script:
