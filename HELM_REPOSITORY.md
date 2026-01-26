@@ -1,12 +1,12 @@
 # Helm Chart Repository
 
-This repository publishes Helm charts automatically via GitHub Actions.
+This repository publishes Helm charts automatically via GitHub Actions (GitHub Pages) and GitLab CI/CD (GitLab Pages).
 
 > **Important**: GitHub Releases in this repository are **Helm chart versions**, not application versions. The chart version (e.g., `yt-playlist-1.0.4`) refers to the Kubernetes deployment configuration, not the YouTube playlist manager application itself. The application version is specified in the chart's `appVersion` field.
 
 ## Usage
 
-### Method 1: GitHub Pages Repository (Recommended)
+### Method 1: GitHub Pages Repository
 
 Add the Helm repository:
 
@@ -24,13 +24,25 @@ helm install yt-playlist yt-playlist/yt-playlist \
   --set clientSecretJson='{"installed":{...}}'
 ```
 
-Search available versions:
+### Method 2: GitLab Pages Repository
+
+Add the Helm repository:
 
 ```bash
-helm search repo yt-playlist
+helm repo add yt-playlist-gitlab https://l4r51.gitlab.io/yt-playlist/
+helm repo update
 ```
 
-### Method 2: From Source
+Install the chart:
+
+```bash
+helm install yt-playlist yt-playlist-gitlab/yt-playlist \
+  --set playlists.todoPlaylistId=PLxxxx \
+  --set playlists.donePlaylistId=PLyyyy \
+  --set clientSecretJson='{"installed":{...}}'
+```
+
+### Method 3: From Source
 
 Clone the repository and install locally:
 
@@ -41,6 +53,24 @@ helm install yt-playlist ./helm/yt-playlist \
   --set playlists.todoPlaylistId=PLxxxx \
   --set playlists.donePlaylistId=PLyyyy \
   --set clientSecretJson='{"installed":{...}}'
+```
+
+## Repository Comparison
+
+| Feature | GitHub Pages | GitLab Pages |
+|---------|--------------|--------------|
+| **URL** | https://l4r5.github.io/yt-playlist/ | https://l4r51.gitlab.io/yt-playlist/ |
+| **Primary** | ✅ Yes | Alternative |
+| **Updates** | On version tag push | On main branch helm/** changes |
+| **Releases** | GitHub Releases UI | No release UI |
+| **Availability** | Public repository | Public repository |
+
+Both repositories contain identical charts. Use either based on your preference or network access.
+
+Search available versions:
+
+```bash
+helm search repo yt-playlist
 ```
 
 ## Chart Versions
