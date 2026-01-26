@@ -59,18 +59,23 @@ helm install yt-playlist ./helm/yt-playlist \
 
 | Feature | GitHub Pages | GitLab Pages |
 |---------|--------------|--------------|
-| **URL** | https://l4r5.github.io/yt-playlist/ | https://l4r51.gitlab.io/yt-playlist/ |
-| **Primary** | ✅ Yes | Alternative |
-| **Updates** | On version tag push | On main branch helm/** changes |
-| **Releases** | GitHub Releases UI | No release UI |
-| **Availability** | Public repository | Public repository |
+| **URL** | [l4r5.github.io/yt-playlist](https://l4r5.github.io/yt-playlist/) | [l4r51.gitlab.io/yt-playlist](https://l4r51.gitlab.io/yt-playlist/) |
+| **Landing Page** | ✅ HTML with instructions | ✅ HTML with instructions |
+| **Primary** | ✅ Yes (recommended) | Alternative mirror |
+| **Updates** | On version tag push (`v*.*.*`) | On main branch `helm/**` changes or manual trigger |
+| **Releases** | ✅ GitHub Releases UI | ❌ No release UI |
+| **CI/CD Platform** | GitHub Actions | GitLab CI/CD |
+| **Availability** | Public | Public |
+| **Auto-cleanup** | ✅ GitHub Actions workflow | ✅ Built-in registry cleanup policy |
 
-Both repositories contain identical charts. Use either based on your preference or network access.
+**Both repositories contain identical charts.** Use either based on your preference or network access. The GitHub repository is recommended as the primary source due to the Releases UI for browsing chart history.
 
 Search available versions:
 
 ```bash
 helm search repo yt-playlist
+# or
+helm search repo yt-playlist-gitlab
 ```
 
 ## Chart Versions
@@ -122,14 +127,14 @@ helm install test helm/yt-playlist --dry-run --debug
 
 To publish a new **Helm chart** release:
 
-1. Update `version` in `helm/yt-playlist/Chart.yaml` (increment for configuration changes)
+1. Update `version` in [helm/yt-playlist/Chart.yaml](helm/yt-playlist/Chart.yaml) (increment for configuration changes)
 2. Update `appVersion` only if the application Docker image version changed
 3. Commit and push to main branch
 4. GitHub Actions will automatically create a **chart release**
 
 **When to bump chart version:**
 - Changed Kubernetes manifests (Deployment, Service, etc.)
-- Modified default values in `values.yaml`
+- Modified default values in [values.yaml](helm/yt-playlist/values.yaml)
 - Added/removed configuration options
 - Changed deployment behavior
 
@@ -140,7 +145,7 @@ To publish a new **Helm chart** release:
 Example:
 
 ```yaml
-# helm/yt-playlist/Chart.yaml
+# [helm/yt-playlist/Chart.yaml](helm/yt-playlist/Chart.yaml)
 apiVersion: v2
 name: yt-playlist
 version: 1.1.0      # Chart/configuration version
@@ -172,13 +177,13 @@ This only needs to be done once - subsequent chart releases will automatically u
 yt-playlist/
 ├── helm/
 │   └── yt-playlist/          # Helm chart
-│       ├── Chart.yaml        # Chart metadata (version here!)
-│       ├── values.yaml       # Default configuration
-│       ├── templates/        # Kubernetes manifests
-│       └── README.md         # Chart documentation
+│       ├── [Chart.yaml](helm/yt-playlist/Chart.yaml)        # Chart metadata (version here!)
+│       ├── [values.yaml](helm/yt-playlist/values.yaml)       # Default configuration
+│       ├── [templates/](helm/yt-playlist/templates/)        # Kubernetes manifests
+│       └── [README.md](helm/yt-playlist/README.md)         # Chart documentation
 └── .github/
     └── workflows/
-        └── helm-release.yml  # Automated publishing
+        └── [helm-release.yml](.github/workflows/helm-release.yml)  # Automated publishing
 ```
 
 ## Troubleshooting
