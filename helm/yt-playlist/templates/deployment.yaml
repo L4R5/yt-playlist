@@ -84,6 +84,68 @@ spec:
               name: {{ include "yt-playlist.fullname" . }}
               key: COOKIES_CONTENT
         {{- end }}
+        {{- if .Values.playlists.failedPlaylistId }}
+        - name: FAILED_PLAYLIST_ID
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: FAILED_PLAYLIST_ID
+        {{- end }}
+        - name: DOWNLOAD_RETRY_DELAY
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: DOWNLOAD_RETRY_DELAY
+        - name: DOWNLOAD_RETRY_MAX_BACKOFF
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: DOWNLOAD_RETRY_MAX_BACKOFF
+        - name: DOWNLOAD_FAILURE_THRESHOLD
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: DOWNLOAD_FAILURE_THRESHOLD
+        {{- if .Values.email.enabled }}
+        - name: EMAIL_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: EMAIL_ENABLED
+        - name: EMAIL_RECIPIENTS
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: EMAIL_RECIPIENTS
+        - name: EMAIL_SMTP_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: EMAIL_SMTP_HOST
+        - name: EMAIL_SMTP_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: EMAIL_SMTP_PORT
+        - name: EMAIL_SMTP_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: EMAIL_SMTP_USERNAME
+        {{- if .Values.email.smtp.from }}
+        - name: EMAIL_FROM
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "yt-playlist.fullname" . }}
+              key: EMAIL_FROM
+        {{- end }}
+        - name: EMAIL_SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.email.existingSecret | default .Values.secretName }}
+              key: EMAIL_SMTP_PASSWORD
+              optional: true
+        {{- end }}
         {{- if or .Values.clientSecretJson .Values.existingSecret }}
         - name: CLIENT_SECRET_JSON
           valueFrom:

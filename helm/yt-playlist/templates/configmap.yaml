@@ -7,6 +7,9 @@ metadata:
 data:
   TODO_PLAYLIST_ID: {{ .Values.playlists.todoPlaylistId | quote }}
   DONE_PLAYLIST_ID: {{ .Values.playlists.donePlaylistId | quote }}
+  {{- if .Values.playlists.failedPlaylistId }}
+  FAILED_PLAYLIST_ID: {{ .Values.playlists.failedPlaylistId | quote }}
+  {{- end }}
   DOWNLOAD_MODE: {{ .Values.download.mode | quote }}
   POLL_INTERVAL: {{ .Values.download.pollInterval | quote }}
   {{- if .Values.download.cookiesFile }}
@@ -14,6 +17,19 @@ data:
   {{- end }}
   {{- if .Values.download.cookiesContent }}
   COOKIES_CONTENT: {{ .Values.download.cookiesContent | quote }}
+  {{- end }}
+  DOWNLOAD_RETRY_DELAY: {{ .Values.download.retry.delay | quote }}
+  DOWNLOAD_RETRY_MAX_BACKOFF: {{ .Values.download.retry.maxBackoff | quote }}
+  DOWNLOAD_FAILURE_THRESHOLD: {{ .Values.download.retry.failureThreshold | quote }}
+  {{- if .Values.email.enabled }}
+  EMAIL_ENABLED: "true"
+  EMAIL_RECIPIENTS: {{ .Values.email.recipients | quote }}
+  EMAIL_SMTP_HOST: {{ .Values.email.smtp.host | quote }}
+  EMAIL_SMTP_PORT: {{ .Values.email.smtp.port | quote }}
+  EMAIL_SMTP_USERNAME: {{ .Values.email.smtp.username | quote }}
+  {{- if .Values.email.smtp.from }}
+  EMAIL_FROM: {{ .Values.email.smtp.from | quote }}
+  {{- end }}
   {{- end }}
   LOG_LEVEL: {{ .Values.logging.level | quote }}
   LOG_FILE: {{ .Values.logging.file | quote }}

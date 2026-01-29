@@ -107,12 +107,14 @@ CREDENTIALS_FILE=client_secret.json     # Option 2: File path (default)
 # Required configuration
 TODO_PLAYLIST_ID=PLxxxx...           # Source playlist (required)
 DONE_PLAYLIST_ID=PLyyyy...           # Destination playlist (required)
+FAILED_PLAYLIST_ID=PLzzzz...         # Failed videos playlist (optional)
 
 # Optional configuration
 DOWNLOAD_PATH=./downloads            # Video storage directory
 POLL_INTERVAL=5                      # Seconds between checks (daemon mode)
 DOWNLOAD_MODE=video                  # 'video' or 'audio' (M4A format)
-METRICS_PORT=8080                    # Prometheus metrics HTTP port
+DOWNLOAD_RETRY_MAX=3                 # Maximum download retry attempts
+DOWNLOAD_RETRY_DELAY=60              # Initial retry delay in seconds (exponential backoff)DOWNLOAD_RETRY_MAX_BACKOFF=3600      # Max backoff time after max retries (default: 1 hour)METRICS_PORT=8080                    # Prometheus metrics HTTP port
 DAILY_QUOTA_LIMIT=10000              # YouTube API daily quota limit
 LOG_LEVEL=INFO                       # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOG_FILE=/tmp/playlist_manager.log   # Log file path (writable location for containers)
@@ -200,8 +202,48 @@ Mode selection via `DOWNLOAD_MODE` env var:
 ```
 
 **Output template**: `'%(title)s.%(ext)s'` (no subdirectories)
-**Retry logic**: 10 retries for download + 10 for fragments
+**Retry logic**: 10 retries for download + 10 for fragments (yt-dlp internal)
 **Certificate validation**: Disabled (`nocheckcertificate: True`)
+
+### Download Retry with Exponential Backoff
+**Configuration** (via environment variables):
+- `DOWNLOAD_RETRY_DELAY=60` - Initial retry delay in seconds (default: 60)
+- `DOWNLOAD_RETRY_MAX_BACKOFF=3600` - Max backoff time in seconds (default: 3600 = 1 hour)
+- `DOWNLOAD_FAILURE_THRESHOLD=10` - Attempts before moving to failed playlist (default: 10)
+
+**Behavior**:
+- Failed downloads are tracked permanently in memory (attempt count, next retry time)
+- Videos in retry cooldown are skipped, allowing other videos to process immediately
+- Non-blocking: daemon processes other videos while waiting for retry timer
+- Delay formula: `min(base_delay * (2 ** (attempt - 1)), max_backoff)`
+- Example timing with defaults: 60s → 120s → 240s → 480s → 960s → 1800s → 3600s (caps at 1 hour)
+- Continues retrying indefinitely with capped exponential backoff
+- If `FAILED_PLAYLIST_ID` is configured, videos exceeding threshold are moved to failed playlist
+- Optional email notifications sent when videos moved to failed playlist
+- Each attempt re-executes yt-dlp download when cooldown expires
+- Detailed logging shows attempt number, next retry time, and failure reason
+- State persists in memory across daemon cycles but resets on application restart
+
+### Failed Playlist & Email Notifications
+**Configuration** (via environment variables):
+- `FAILED_PLAYLIST_ID` - Optional playlist for permanently failed videos
+- `EMAIL_ENABLED=false` - Set to 'true' to enable email notifications
+- `EMAIL_RECIPIENTS` - Comma-separated email addresses
+- `EMAIL_SMTP_HOST` - SMTP server (default: smtp.gmail.com)
+- `EMAIL_SMTP_PORT` - SMTP port (default: 587 for TLS)
+- `EMAIL_SMTP_USERNAME` - SMTP authentication username
+- `EMAIL_SMTP_PASSWORD` - SMTP authentication password (use app-specific password for Gmail)
+- `EMAIL_FROM` - From address (defaults to EMAIL_SMTP_USERNAME)
+
+**Behavior**:
+- When a video exceeds `DOWNLOAD_FAILURE_THRESHOLD` attempts:
+  1. Video is moved to FAILED_PLAYLIST_ID (if configured)
+  2. Video is removed from TODO playlist
+  3. Email notification sent to all recipients (if EMAIL_ENABLED=true)
+  4. Retry state cleared - video will not be retried
+- Email includes video title, URL, attempt count, and failure threshold
+- Supports both plain text and HTML email formats
+- Uses SMTP with STARTTLS for secure email delivery
 
 ## OAuth2 Token Lifecycle
 
@@ -260,8 +302,15 @@ python -c "from google.oauth2.credentials import Credentials; \
 - Uses `googleapiclient.errors.HttpError` with status code inspection
 
 ### Download Failures
-- yt-dlp exception → Logged, video stays in todo playlist for retry
-- Process continues to next video (no abort on single failure)
+- **Non-blocking retry**: Videos in cooldown are skipped, other videos process immediately
+- **Retry state tracking**: In-memory state tracks attempt count and next retry time per video (persists across cycles)
+- **Retry delays**: Capped exponential backoff starting at `DOWNLOAD_RETRY_DELAY`, doubles each attempt until reaching `DOWNLOAD_RETRY_MAX_BACKOFF`
+- **Skipped videos**: Logged at debug level with cooldown remaining time and next retry timestamp
+- **Failure handling**: Continues retrying indefinitely with capped backoff (no limit on attempts)
+- **Logging**: Each attempt logged with retry number, next retry time, and failure details
+- **Process continuation**: Skipped videos don't block - daemon continues processing other videos
+- **Implementation**: `download_video()` attempts once and updates retry state, `process_video()` checks cooldown before attempting
+- **Permanent tracking**: Failed videos remain tracked in memory until successful or application restart
 
 ## Code Conventions
 

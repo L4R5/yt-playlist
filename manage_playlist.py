@@ -12,6 +12,9 @@ import json
 import logging
 import argparse
 import shutil
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from pathlib import Path
 from typing import List, Dict, Optional
 from threading import Thread
@@ -36,12 +39,25 @@ CREDENTIALS_FILE = os.getenv('CREDENTIALS_FILE', 'client_secret.json')
 TOKEN_FILE = os.getenv('TOKEN_FILE', 'token.json')
 TODO_PLAYLIST_ID = os.getenv('TODO_PLAYLIST_ID')
 DONE_PLAYLIST_ID = os.getenv('DONE_PLAYLIST_ID')
+FAILED_PLAYLIST_ID = os.getenv('FAILED_PLAYLIST_ID', '')  # Optional: playlist for permanently failed videos
 DOWNLOAD_PATH = Path(os.getenv('DOWNLOAD_PATH', './downloads'))
 POLL_INTERVAL = int(os.getenv('POLL_INTERVAL', 5))
 DOWNLOAD_MODE = os.getenv('DOWNLOAD_MODE', 'video').lower()  # 'video' or 'audio'
 COOKIES_FILE = os.getenv('COOKIES_FILE', '')  # Optional: path to cookies.txt file
 COOKIES_CONTENT = os.getenv('COOKIES_CONTENT', '')  # Optional: cookies.txt content as string
 METRICS_PORT = int(os.getenv('METRICS_PORT', 8080))
+DOWNLOAD_RETRY_DELAY = int(os.getenv('DOWNLOAD_RETRY_DELAY', 60))  # Initial retry delay in seconds
+DOWNLOAD_RETRY_MAX_BACKOFF = int(os.getenv('DOWNLOAD_RETRY_MAX_BACKOFF', 3600))  # Max backoff time in seconds (default: 1 hour)
+DOWNLOAD_FAILURE_THRESHOLD = int(os.getenv('DOWNLOAD_FAILURE_THRESHOLD', 10))  # Attempts before moving to failed playlist
+
+# Email notification settings
+EMAIL_ENABLED = os.getenv('EMAIL_ENABLED', 'false').lower() == 'true'
+EMAIL_RECIPIENTS = os.getenv('EMAIL_RECIPIENTS', '')  # Comma-separated email addresses
+EMAIL_SMTP_HOST = os.getenv('EMAIL_SMTP_HOST', 'smtp.gmail.com')
+EMAIL_SMTP_PORT = int(os.getenv('EMAIL_SMTP_PORT', 587))
+EMAIL_SMTP_USERNAME = os.getenv('EMAIL_SMTP_USERNAME', '')
+EMAIL_SMTP_PASSWORD = os.getenv('EMAIL_SMTP_PASSWORD', '')
+EMAIL_FROM = os.getenv('EMAIL_FROM', EMAIL_SMTP_USERNAME)  # Default to SMTP username
 
 # OAuth2 scopes for YouTube API
 SCOPES = ['https://www.googleapis.com/auth/youtube']
@@ -58,7 +74,7 @@ DAILY_QUOTA_LIMIT = int(os.getenv('DAILY_QUOTA_LIMIT', 10000))
 videos_processed_total = Counter(
     'yt_playlist_videos_processed_total',
     'Total number of videos processed',
-    ['status']  # status: success, download_failed, api_failed
+    ['status']  # status: success, download_failed, api_failed, permanent_failure
 )
 
 downloads_total = Counter(
@@ -164,7 +180,7 @@ quota_tracker = QuotaTracker()
 class PlaylistManager:
     """Manages YouTube playlist operations and video downloads."""
     
-    def __init__(self, credentials_file: str, token_file: str, todo_playlist_id: str, done_playlist_id: str):
+    def __init__(self, credentials_file: str, token_file: str, todo_playlist_id: str, done_playlist_id: str, failed_playlist_id: str = ''):
         """
         Initialize the playlist manager.
         
@@ -173,12 +189,15 @@ class PlaylistManager:
             token_file: Path to store OAuth2 tokens
             todo_playlist_id: Source playlist with videos to download
             done_playlist_id: Destination playlist for completed downloads
+            failed_playlist_id: Optional playlist for permanently failed videos
         """
         self.credentials_file = credentials_file
         self.token_file = token_file
         self.todo_playlist_id = todo_playlist_id
         self.done_playlist_id = done_playlist_id
+        self.failed_playlist_id = failed_playlist_id
         self.youtube = None
+        self.retry_state = {}  # Track retry state per video: {video_id: {attempt: int, next_retry: timestamp}}
         self._init_youtube_client()
     
     def _get_credentials(self) -> Credentials:
@@ -323,9 +342,155 @@ class PlaylistManager:
                 logger.error(f"  Please verify playlist exists: https://www.youtube.com/playlist?list={playlist_id}")
             return []
     
+    def send_failure_notification(self, video: Dict[str, str], attempts: int) -> bool:
+        """
+        Send email notification for permanently failed video.
+        
+        Args:
+            video: Video dictionary with metadata
+            attempts: Number of failed attempts
+            
+        Returns:
+            True if notification sent successfully, False otherwise
+        """
+        if not EMAIL_ENABLED or not EMAIL_RECIPIENTS:
+            return False
+        
+        recipients = [email.strip() for email in EMAIL_RECIPIENTS.split(',') if email.strip()]
+        if not recipients:
+            logger.warning("EMAIL_ENABLED=true but no EMAIL_RECIPIENTS configured")
+            return False
+        
+        try:
+            # Create email message
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = f'YouTube Download Failed: {video["title"]}'
+            msg['From'] = EMAIL_FROM
+            msg['To'] = ', '.join(recipients)
+            
+            # Plain text body
+            text_body = f"""
+YouTube Video Download Failed
+
+Video: {video['title']}
+URL: {video['video_url']}
+Failed Attempts: {attempts}
+Threshold: {DOWNLOAD_FAILURE_THRESHOLD}
+
+The video has been moved to the failed playlist and will no longer be retried.
+"""
+            
+            # HTML body
+            html_body = f"""
+<html>
+  <body>
+    <h2>YouTube Video Download Failed</h2>
+    <p><strong>Video:</strong> {video['title']}</p>
+    <p><strong>URL:</strong> <a href="{video['video_url']}">{video['video_url']}</a></p>
+    <p><strong>Failed Attempts:</strong> {attempts}</p>
+    <p><strong>Threshold:</strong> {DOWNLOAD_FAILURE_THRESHOLD}</p>
+    <p>The video has been moved to the failed playlist and will no longer be retried.</p>
+  </body>
+</html>
+"""
+            
+            msg.attach(MIMEText(text_body, 'plain'))
+            msg.attach(MIMEText(html_body, 'html'))
+            
+            # Send email
+            with smtplib.SMTP(EMAIL_SMTP_HOST, EMAIL_SMTP_PORT) as server:
+                server.starttls()
+                if EMAIL_SMTP_USERNAME and EMAIL_SMTP_PASSWORD:
+                    server.login(EMAIL_SMTP_USERNAME, EMAIL_SMTP_PASSWORD)
+                server.send_message(msg)
+            
+            logger.info(f"Sent failure notification email to {len(recipients)} recipient(s)")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to send email notification: {e}")
+            return False
+    
     def download_video(self, video: Dict[str, str], download_path: Path) -> bool:
         """
-        Download a video using yt-dlp.
+        Download a video using yt-dlp with non-blocking retry logic.
+        Tracks retry state permanently and schedules future attempts with capped exponential backoff.
+        
+        Args:
+            video: Video dictionary with url and metadata
+            download_path: Directory to save downloaded videos
+            
+        Returns:
+            True if download successful, False if failed (will retry later)
+        """
+        video_id = video['video_id']
+        base_delay = DOWNLOAD_RETRY_DELAY
+        max_backoff = DOWNLOAD_RETRY_MAX_BACKOFF
+        
+        # Get current retry state
+        state = self.retry_state.get(video_id, {'attempt': 0, 'next_retry': 0})
+        current_attempt = state['attempt']
+        
+        try:
+            success = self._attempt_download(video, download_path)
+            if success:
+                # Clear retry state on success
+                if video_id in self.retry_state:
+                    del self.retry_state[video_id]
+                    logger.info(f"Download succeeded after {current_attempt} previous failure(s)")
+                return True
+                
+        except Exception as e:
+            # Increment attempt counter
+            current_attempt += 1
+            
+            # Check if failure threshold exceeded
+            if self.failed_playlist_id and current_attempt >= DOWNLOAD_FAILURE_THRESHOLD:
+                logger.error(
+                    f"Download attempt {current_attempt} failed for {video['title']}: {e}. "
+                    f"Failure threshold ({DOWNLOAD_FAILURE_THRESHOLD}) exceeded. Moving to failed playlist."
+                )
+                
+                # Move to failed playlist
+                if self.add_to_playlist(self.failed_playlist_id, video['video_id']):
+                    logger.info(f"Moved {video['title']} to failed playlist")
+                    
+                    # Send email notification
+                    self.send_failure_notification(video, current_attempt)
+                    
+                    # Clear retry state
+                    if video_id in self.retry_state:
+                        del self.retry_state[video_id]
+                    
+                    downloads_total.labels(status='failed').inc()
+                    # Return special marker to indicate permanent failure
+                    return 'permanent_failure'
+                else:
+                    logger.error(f"Failed to move {video['title']} to failed playlist, will keep retrying")
+            
+            # Calculate exponential backoff delay, capped at max_backoff
+            delay = min(base_delay * (2 ** (current_attempt - 1)), max_backoff)
+            
+            next_retry_time = time.time() + delay
+            
+            self.retry_state[video_id] = {
+                'attempt': current_attempt,
+                'next_retry': next_retry_time
+            }
+            
+            logger.warning(
+                f"Download attempt {current_attempt} failed for {video['title']}: {e}. "
+                f"Will retry in {delay}s ({delay//60}min) at next cycle after {time.strftime('%H:%M:%S', time.localtime(next_retry_time))}."
+            )
+            
+            downloads_total.labels(status='failed').inc()
+            return False
+        
+        return False
+    
+    def _attempt_download(self, video: Dict[str, str], download_path: Path) -> bool:
+        """
+        Attempt to download a video once (used by download_video for retries).
         
         Args:
             video: Video dictionary with url and metadata
@@ -337,10 +502,10 @@ class PlaylistManager:
         # Configure format based on download mode
         if DOWNLOAD_MODE == 'audio':
             format_string = 'bestaudio[ext=m4a]/bestaudio'
-            logger.info(f"Download mode: audio-only (original format)")
+            logger.debug(f"Download mode: audio-only (original format)")
         else:
             format_string = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
-            logger.info(f"Download mode: full video")
+            logger.debug(f"Download mode: full video")
         
         # Detect Node.js path for JavaScript runtime support
         node_path = shutil.which('node')
@@ -402,7 +567,7 @@ class PlaylistManager:
             logger.debug(f"Using cookies from file: {COOKIES_FILE}")
         
         try:
-            logger.info(f"Starting download: {video['title']}")
+            logger.info(f"Downloading: {video['title']}")
             downloads_total.labels(status='attempted').inc()
             
             with processing_duration_seconds.labels(operation='download').time():
@@ -413,10 +578,6 @@ class PlaylistManager:
             downloads_total.labels(status='success').inc()
             return True
             
-        except Exception as e:
-            logger.error(f"Failed to download {video['title']}: {e}")
-            downloads_total.labels(status='failed').inc()
-            return False
         finally:
             # Clean up temp cookies file if created
             if cookies_temp_file and os.path.exists(cookies_temp_file.name):
@@ -487,18 +648,44 @@ class PlaylistManager:
     def process_video(self, video: Dict[str, str], download_path: Path) -> bool:
         """
         Process a single video: download, remove from todo, add to done.
+        Skips videos that are in retry cooldown period.
         
         Args:
             video: Video dictionary with metadata
             download_path: Directory to save downloaded videos
             
         Returns:
-            True if entire process successful, False otherwise
+            True if entire process successful, False otherwise, None if skipped
         """
+        video_id = video['video_id']
+        
+        # Check if video is in retry cooldown
+        if video_id in self.retry_state:
+            state = self.retry_state[video_id]
+            next_retry = state['next_retry']
+            if time.time() < next_retry:
+                # Still in cooldown - skip for now
+                wait_seconds = int(next_retry - time.time())
+                logger.debug(
+                    f"Skipping {video['title']} - in retry cooldown (attempt {state['attempt']}, "
+                    f"retry in {wait_seconds}s at {time.strftime('%H:%M:%S', time.localtime(next_retry))})"
+                )
+                return None  # None indicates skipped
+            else:
+                # Cooldown expired - proceed with retry
+                logger.info(f"Retry cooldown expired for {video['title']} - attempting download (attempt {state['attempt'] + 1})")
+        
         logger.info(f"Processing video: {video['title']}")
         
         # Step 1: Download video
-        if not self.download_video(video, download_path):
+        download_result = self.download_video(video, download_path)
+        if download_result == 'permanent_failure':
+            # Video moved to failed playlist, remove from todo
+            if self.remove_from_playlist(video['playlist_item_id']):
+                logger.info(f"Removed permanently failed video from todo playlist: {video['title']}")
+                videos_processed_total.labels(status='permanent_failure').inc()
+            return False
+        elif not download_result:
             return False
         
         # Step 2: Add to done playlist
@@ -548,11 +735,15 @@ class PlaylistManager:
         logger.info(f"Found {len(videos)} videos to process")
         
         # Process each video
+        skipped_count = 0
         for video in videos:
             try:
                 with processing_duration_seconds.labels(operation='full_cycle').time():
-                    success = self.process_video(video, download_path)
-                    if not success:
+                    result = self.process_video(video, download_path)
+                    if result is None:
+                        # Video skipped (in cooldown)
+                        skipped_count += 1
+                    elif not result:
                         videos_processed_total.labels(status='download_failed').inc()
             except Exception as e:
                 logger.error(f"Unexpected error processing {video['title']}: {e}")
@@ -561,6 +752,8 @@ class PlaylistManager:
         
         cycle_duration = time.time() - cycle_start
         logger.info(f"Playlist processing cycle complete (took {cycle_duration:.1f}s)")
+        if skipped_count > 0:
+            logger.info(f"Skipped {skipped_count} video(s) in retry cooldown")
         logger.info(f"API Quota Used: {quota_tracker.used}/{DAILY_QUOTA_LIMIT} ({quota_tracker.get_remaining()} remaining)")
         last_processing_timestamp.set(time.time())
     
@@ -680,6 +873,13 @@ def main():
     logger.info(f"Daily quota limit: {DAILY_QUOTA_LIMIT}")
     logger.info(f"TODO playlist: {TODO_PLAYLIST_ID}")
     logger.info(f"DONE playlist: {DONE_PLAYLIST_ID}")
+    if FAILED_PLAYLIST_ID:
+        logger.info(f"FAILED playlist: {FAILED_PLAYLIST_ID}")
+        logger.info(f"Failure threshold: {DOWNLOAD_FAILURE_THRESHOLD} attempts")
+    logger.info(f"Email notifications: {'enabled' if EMAIL_ENABLED else 'disabled'}")
+    if EMAIL_ENABLED:
+        logger.info(f"Email recipients: {EMAIL_RECIPIENTS}")
+        logger.info(f"Email SMTP: {EMAIL_SMTP_HOST}:{EMAIL_SMTP_PORT}")
     logger.info(f"Token file: {TOKEN_FILE}")
     if CLIENT_SECRET_JSON:
         logger.info(f"Credentials: CLIENT_SECRET_JSON environment variable (length: {len(CLIENT_SECRET_JSON)} chars)")
@@ -720,7 +920,8 @@ def main():
             credentials_file=CREDENTIALS_FILE,
             token_file=TOKEN_FILE,
             todo_playlist_id=TODO_PLAYLIST_ID,
-            done_playlist_id=DONE_PLAYLIST_ID
+            done_playlist_id=DONE_PLAYLIST_ID,
+            failed_playlist_id=FAILED_PLAYLIST_ID
         )
     except Exception as e:
         logger.error(f"Failed to initialize playlist manager: {e}")

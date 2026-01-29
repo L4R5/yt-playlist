@@ -79,6 +79,7 @@ helm upgrade yt-playlist ./helm/yt-playlist --set auth.enabled=false --reuse-val
 |-----------|-------------|---------|
 | `playlists.todoPlaylistId` | Source playlist ID | `PLxxxx...` |
 | `playlists.donePlaylistId` | Destination playlist ID | `PLyyyy...` |
+| `playlists.failedPlaylistId` | Failed videos playlist (optional) | `PLzzzz...` |
 | `clientSecretJson` | OAuth2 client secret (JSON string) | `{"installed":{...}}` |
 
 ### Optional Values
@@ -89,6 +90,15 @@ helm upgrade yt-playlist ./helm/yt-playlist --set auth.enabled=false --reuse-val
 | `image.tag` | Container image tag (defaults to Chart.AppVersion) | `""` |
 | `download.mode` | Download mode (video/audio) | `video` |
 | `download.pollInterval` | Polling interval in seconds | `300` |
+| `download.retry.delay` | Initial retry delay in seconds | `60` |
+| `download.retry.maxBackoff` | Max backoff time in seconds | `3600` |
+| `download.retry.failureThreshold` | Attempts before moving to failed playlist | `10` |
+| `email.enabled` | Enable email notifications | `false` |
+| `email.recipients` | Comma-separated email addresses | `""` |
+| `email.smtp.host` | SMTP server hostname | `smtp.gmail.com` |
+| `email.smtp.port` | SMTP server port | `587` |
+| `email.smtp.username` | SMTP username | `""` |
+| `email.smtp.password` | SMTP password (app-specific for Gmail) | `""` |
 | `logging.level` | Log level (DEBUG/INFO/WARNING/ERROR/CRITICAL) | `INFO` |
 | `logging.file` | Log file path | `/tmp/playlist_manager.log` |
 | `persistence.enabled` | Enable persistent storage | `true` |
@@ -113,14 +123,30 @@ Create a `custom-values.yaml`:
 
 ```yaml
 # Image configuration
-image:
-  repository: ghcr.io/l4r5/yt-playlist
-  tag: latest
-  pullPolicy: Always
+  failedPlaylistId: PLzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz  # Optional: for permanently failed videos
 
-# Playlists (REQUIRED)
-playlists:
-  todoPlaylistId: PLxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# OAuth2 credentials (REQUIRED for first deployment)
+clientSecretJson: '{"installed":{"client_id":"YOUR_CLIENT_ID","client_secret":"YOUR_CLIENT_SECRET","redirect_uris":["http://localhost"]}}'
+
+# Download settings
+download:
+  mode: video  # or 'audio'
+  pollInterval: 300
+  retry:
+    delay: 60  # Initial retry delay in seconds
+    maxBackoff: 3600  # Cap at 1 hour
+    failureThreshold: 10  # Attempts before moving to failed playlist
+
+# Email notifications (optional)
+email:
+  enabled: true
+  recipients: admin@example.com,alerts@example.com
+  smtp:
+    host: smtp.gmail.com
+    port: 587
+    username: notifications@gmail.com
+    password: your-app-specific-password  # Use --set-string for sensitive data
+    from: YT Playlist <notifications@gmail.com>Lxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
   donePlaylistId: PLyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
 
 # OAuth2 credentials (REQUIRED for first deployment)

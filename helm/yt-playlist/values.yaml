@@ -85,6 +85,8 @@ playlists:
   todoPlaylistId: ""
   # Destination playlist for completed downloads
   donePlaylistId: ""
+  # Optional: Destination playlist for permanently failed videos
+  failedPlaylistId: ""
 
 # Download configuration
 download:
@@ -97,6 +99,15 @@ download:
   cookiesFile: ""
   # Method 2: Cookies content as string (recommended - store in secret)
   cookiesContent: ""
+  
+  # Retry configuration (exponential backoff)
+  retry:
+    # Initial retry delay in seconds (doubles each attempt)
+    delay: 60
+    # Maximum backoff time in seconds (default: 1 hour)
+    maxBackoff: 3600
+    # Number of attempts before moving to failed playlist (requires failedPlaylistId)
+    failureThreshold: 10
 
 # Logging configuration
 logging:
@@ -104,6 +115,25 @@ logging:
   level: INFO
   # Log file path (container filesystem)
   file: /tmp/playlist_manager.log
+
+# Email notifications for permanently failed videos
+email:
+  # Enable email notifications
+  enabled: false
+  # Comma-separated list of recipient email addresses
+  recipients: ""
+  # SMTP server configuration
+  smtp:
+    host: smtp.gmail.com
+    port: 587
+    username: ""
+    # Password - stored in secret (provide via --set-string email.smtp.password or existingSecret)
+    password: ""
+    # From address (defaults to username if not set)
+    from: ""
+  # Option: Use existing secret for SMTP password
+  # existingSecret: "yt-playlist-email-secret"
+  # Secret must contain key: EMAIL_SMTP_PASSWORD
 
 # Tailscale VPN sidecar (routes traffic through your home network)
 tailscale:
