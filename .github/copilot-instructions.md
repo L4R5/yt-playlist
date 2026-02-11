@@ -8,7 +8,7 @@ Single-file Python application that monitors a YouTube "todo" playlist, download
 ### Running the Application Locally
 **Always use the virtual environment** when running the app locally:
 ```bash
-cd /home/lamerke/git/yt-playlist
+# From the project root directory
 source venv/bin/activate  # Always activate venv first
 python manage_playlist.py  # Run application
 ```
@@ -20,7 +20,7 @@ This ensures:
 ## Architecture
 
 ### Single Module Design
-**manage_playlist.py** (737 lines) - Complete application in one file:
+**manage_playlist.py** (938 lines) - Complete application in one file:
 - `PlaylistManager` class encapsulates all YouTube API operations
 - OAuth2 authentication with automatic token refresh
 - Video processing pipeline: download → add to done → remove from todo
@@ -154,7 +154,7 @@ COOKIES_CONTENT="..."                # Cookies content as string (for secrets)
 The application exposes metrics on port 8080 (configurable via `METRICS_PORT`):
 
 **Counters:**
-- `yt_playlist_videos_processed_total{status}` - Videos processed (success/download_failed/api_failed)
+- `yt_playlist_videos_processed_total{status}` - Videos processed (success/download_failed/api_failed/permanent_failure)
 - `yt_playlist_downloads_total{status}` - Downloads attempted (success/failed)
 - `yt_playlist_api_calls_total{operation}` - API calls (list/insert/delete)
 
@@ -259,17 +259,17 @@ Mode selection via `DOWNLOAD_MODE` env var:
    - Saves credentials to `token.json`
 
 2. **Subsequent runs**: `token.json` exists and valid
-   - Loads credentials from file (line 81)
-   - Validates token with `creds.valid` check (line 85)
+   - Loads credentials from file (`_get_credentials()` method)
+   - Validates token with `creds.valid` check
    - Silent execution, no browser interaction
 
 3. **Token expiry**: Access token expired but refresh token valid
-   - Auto-refreshes via `creds.refresh(Request())` (line 88)
-   - Updates `token.json` with new access token (line 103)
+   - Auto-refreshes via `creds.refresh(Request())`
+   - Updates `token.json` with new access token
    - No user interaction required
 
 4. **Token invalidation**: Refresh token revoked or corrupted
-   - Re-runs full OAuth flow via `InstalledAppFlow` (line 97)
+   - Re-runs full OAuth flow via `InstalledAppFlow`
    - Opens browser for re-authentication
 
 ### Debugging Authentication Issues
@@ -292,12 +292,12 @@ python -c "from google.oauth2.credentials import Credentials; \
 ## Error Handling Patterns
 
 ### Authentication Failures
-- Missing `client_secret.json` → FileNotFoundError with setup instructions (line 92)
-- Expired token → Auto-refresh via `creds.refresh(Request())` (line 88)
-- Invalid token → Re-runs OAuth flow via `InstalledAppFlow` (line 97)
+- Missing `client_secret.json` → FileNotFoundError with setup instructions
+- Expired token → Auto-refresh via `creds.refresh(Request())`
+- Invalid token → Re-runs OAuth flow via `InstalledAppFlow`
 
 ### API Errors
-- HTTP 404 on playlist fetch → Logs 3 possible reasons (see lines 164-171)
+- HTTP 404 on playlist fetch → Logs 3 possible reasons (see `get_playlist_videos()` method)
 - Playlist modification fails → Warning logged, continues processing
 - Uses `googleapiclient.errors.HttpError` with status code inspection
 
@@ -329,7 +329,7 @@ def get_playlist_videos(self, playlist_id: str) -> List[Dict[str, str]]:
 Dictionary structure: `{'playlist_item_id': str, 'video_id': str, 'title': str, 'video_url': str}`
 
 ### Configuration Validation
-`validate_config()` function (line 371) checks:
+`validate_config()` function (line 783) checks:
 - File existence: `CREDENTIALS_FILE`
 - Required env vars: `TODO_PLAYLIST_ID`, `DONE_PLAYLIST_ID`
 - Exits with status 1 if validation fails
@@ -525,7 +525,7 @@ helm unittest .  # Requires: helm plugin install https://github.com/helm-unittes
 ### Cookie Format Normalization
 - App automatically converts spaces to tabs (Netscape format requirement)
 - Both `COOKIES_FILE` (path) and `COOKIES_CONTENT` (string) supported
-- Implemented in lines 361-395 of `manage_playlist.py`
+- Implemented in `_attempt_download()` method of `PlaylistManager` class
 - Creates temporary file from `COOKIES_CONTENT` at runtime
 
 ### Export Methods
