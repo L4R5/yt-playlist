@@ -35,9 +35,9 @@ helm-test:
 # Build main application Docker image
 build-yt-playlist:
   stage: build
-  image: docker:24-dind
+  image: docker:29-dind
   services:
-    - docker:24-dind
+    - docker:29-dind
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker context create builder
@@ -79,9 +79,9 @@ build-yt-playlist:
 # Build auth-ui Docker image
 build-auth-ui:
   stage: build
-  image: docker:24-dind
+  image: docker:29-dind
   services:
-    - docker:24-dind
+    - docker:29-dind
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker context create builder
