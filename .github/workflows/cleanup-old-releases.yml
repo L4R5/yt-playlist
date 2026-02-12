@@ -28,7 +28,7 @@ jobs:
     
     steps:
       - name: Cleanup old releases
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const keepCount = parseInt(process.env.KEEP_COUNT);
@@ -85,7 +85,7 @@ jobs:
     
     steps:
       - name: Cleanup old container images for ${{ matrix.image }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const keepCount = parseInt(process.env.KEEP_COUNT);
